@@ -25,6 +25,7 @@ import PixivFanboxHandler
 import PixivHelper
 import PixivImageHandler
 import PixivListHandler
+import PixivMemberDumpHandler
 import PixivModelFanbox
 import PixivNovelHandler
 import PixivRankingHandler
@@ -842,6 +843,29 @@ def menu_export_online_user_bookmark(opisvalid, args, options):
     PixivBookmarkHandler.export_bookmark(sys.modules[__name__], __config__, filename, 'n', 1, 0, member_id)
 
 
+def menu_export_online_member(opisvalid, args, options):
+    __log__.info('Query & Export Member mode (q).')
+    filename = "memberdata.txt"
+    member_ids = list()
+
+    if opisvalid and len(args) > 2:
+        filename = args[0]
+
+        for i in range(1, len(args)):
+            member_id = args[i]
+            if member_id.isdigit():
+                member_ids.append(int(member_id))
+            else:
+                print(f"Possible invalid member id = {member_id}")
+    else:
+        filename = input("Filename: ").rstrip("\r") or filename
+        member_ids = input('Member ids: ').rstrip("\r")
+        member_ids = PixivHelper.get_ids_from_csv(member_ids)
+        PixivHelper.print_and_log('info', f"Member IDs: {member_ids}")
+
+    PixivMemberDumpHandler.export_member_list(sys.modules[__name__], __config__, filename, member_ids)
+
+
 def menu_export_from_online_image_bookmark(opisvalid, args, options):
     __log__.info("Export User's Image Bookmark mode (p).")
     start_page = 1
@@ -1199,7 +1223,7 @@ def setup_option_parser():
     __valid_options = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18',
                        'f1', 'f2', 'f3', 'f4', 'f5',
                        's1', 's2',
-                       'l', 'd', 'e', 'm', 'b', 'p', 'c')
+                       'l', 'd', 'e', 'm', 'q', 'b', 'p', 'c')
     parser = OptionParser()
 
     # need to keep the whitespace to adjust the output for --help
@@ -1229,6 +1253,7 @@ l  - Export local database (image_id)               \n
 e  - Export online bookmark                         \n
 m  - Export online user bookmark                    \n
 p  - Export online image bookmark                   \n
+q  - Dump member informations                       \n
 d  - Manage database''')
     parser.add_option('-x', '--exit_when_done',
                       dest='exit_when_done',
@@ -1435,6 +1460,8 @@ def main_loop(ewd, op_is_valid, selection, np_is_valid_local, args, options):
                 menu_export_from_online_image_bookmark(op_is_valid, args, options)
             elif selection == 'u':
                 menu_ugoira_reencode(op_is_valid, args, options)
+            elif selection == 'q':
+                menu_export_online_member(op_is_valid, args, options)
             elif selection == 'd':
                 __dbManager__.main()
             elif selection == 'r':
@@ -1564,7 +1591,8 @@ def main():
     (options, args) = parser.parse_args()
 
     PixivHelper.set_logpath(options.log_path)
-    PixivHelper.safePrint('Log file path changed to: %s' % options.log_path)
+    if options.log_path is not None:
+        PixivHelper.safePrint('Log file path changed to: %s' % options.log_path)
     __log__ = PixivHelper.get_logger()
 
     op = options.start_action
