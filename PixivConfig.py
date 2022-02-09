@@ -49,16 +49,27 @@ class ConfigItem():
         return return_value
 
 
+__logger = None
+
+
+# Lazy-init
+def get_logger():
+    global __logger
+    if __logger is None:
+        __logger = PixivHelper.get_logger()
+    return __logger
+
+
 class PixivConfig():
     '''Configuration class'''
-    __logger = PixivHelper.get_logger()
+    # __logger = PixivHelper.get_logger()
     configFileLocation = "config.ini"
 
     __items = [
         ConfigItem("Network", "useProxy", False),
         ConfigItem("Network", "proxyAddress", ""),
         ConfigItem("Network", "useragent",
-                   "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.124 Safari/537.36"),
+                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36 PixivUtil2/DEV"),
         ConfigItem("Network", "useRobots", True),
         ConfigItem("Network", "timeout", 60),
         ConfigItem("Network", "retry", 3),
@@ -242,7 +253,7 @@ class PixivConfig():
                 content = reader.read()
         except BaseException:
             print('Error at loadConfig() reading file:', self.configFileLocation, "\n", sys.exc_info())
-            self.__logger.exception('Error at loadConfig() reading file: %s', self.configFileLocation)
+            get_logger().exception('Error at loadConfig() reading file: %s', self.configFileLocation)
             self.writeConfig(error=True, path=self.configFileLocation)
             return
 
@@ -282,7 +293,7 @@ class PixivConfig():
                 value = item.process_value(value)
             except ValueError:
                 print(Fore.RED + Style.BRIGHT + f"{sys.exc_info()}" + Style.RESET_ALL)
-                self.__logger.exception('Error at process_value() of : %s', item.option)
+                get_logger().exception('Error at process_value() of : %s', item.option)
                 print(Fore.YELLOW + Style.BRIGHT + f"{item.option} = {item.default}" + Style.RESET_ALL)
                 value = item.default
                 haveError = True
@@ -329,10 +340,10 @@ class PixivConfig():
                 else:
                     print("Backing up old config to config.ini.bak")
                     shutil.move(configlocation, configlocation + '.bak')
-            self.__logger.debug(f"renaming {configlocation}.tmp to {configlocation}")
+            get_logger().debug(f"renaming {configlocation}.tmp to {configlocation}")
             os.rename(configlocation + '.tmp', configlocation)
         except BaseException:
-            self.__logger.exception('Error at writeConfig()')
+            get_logger().exception('Error at writeConfig()')
             raise
 
         print('Configuration saved.')

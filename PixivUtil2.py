@@ -78,7 +78,7 @@ __dbManager__ = None
 __br__ = None
 __blacklistTags = list()
 __suppressTags = list()
-__log__ = PixivHelper.get_logger()
+__log__ = None
 __errorList = list()
 __blacklistMembers = list()
 __blacklistTitles = list()
@@ -1183,6 +1183,10 @@ Used in option 3, 5, 7, and 8.''')
                       dest='rank_content',
                       default="all",
                       help='''Ranking Content Type.''')
+    parser.add_option('-l', '--logpath',
+                      dest='log_path',
+                      default=None,
+                      help='''Log File Path. (Example: C:\\PixivUtil2\\Logs\\Log.log)''')
     return parser
 
 
@@ -1368,9 +1372,14 @@ def main():
     global ERROR_CODE
     global __dbManager__
     global __valid_options
+    global __log__
 
     parser = setup_option_parser()
     (options, args) = parser.parse_args()
+
+    PixivHelper.set_logpath(options.log_path)
+    PixivHelper.safePrint('Log file path changed to: %s' % options.log_path)
+    __log__ = PixivHelper.get_logger()
 
     op = options.start_action
     if op in __valid_options:

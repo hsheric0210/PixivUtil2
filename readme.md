@@ -290,6 +290,7 @@ Please refer run with `--help` for latest information.
   -n NUMBEROFPAGES, --numberofpages=NUMBEROFPAGES
                         temporarily overwrites numberOfPage set in config.ini
   -c [PATH], --config [PATH] provide different config.ini
+  -logpath [PATH]       Use different log file.
 ```
 
 # Error Codes
@@ -533,7 +534,7 @@ Please refer run with `--help` for latest information.
   Used to filter out the url in the description using regular expression.
 - dbPath
 
-  Use different database.
+  Use different database. Or leave it blank to use default database path. (Example: `C:\PixivUtil2-Database\DifferentDatabase.sqlite`)
 - setLastModified
 
   Set last modified timestamp based on pixiv upload timestamp.
