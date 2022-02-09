@@ -40,6 +40,7 @@ from PixivModelFanbox import FanboxArtist, FanboxPost
 
 logger = None
 _config = None
+_logpath = None
 __re_manga_index = re.compile(r'_p(\d+)')
 __badchars__ = None
 if platform.system() == 'Windows':
@@ -66,14 +67,23 @@ def set_config(config):
     _config = config
 
 
+def set_logpath(logpath):
+    global _logpath
+    _logpath = logpath
+
+
 def get_logger(level=logging.DEBUG):
     '''Set up logging'''
     global logger
     if logger is None:
-        script_path = module_path()
+        logfilename = _logpath
+        if logfilename is None or len(logfilename) == 0:
+            logfilename = module_path() + os.sep + PixivConstant.PIXIVUTIL_LOG_FILE
+        safePrint('log file: %s' % logfilename)
+        traceback.print_stack()
         logger = logging.getLogger('PixivUtil' + PixivConstant.PIXIVUTIL_VERSION)
         logger.setLevel(level)
-        __logHandler__ = logging.handlers.RotatingFileHandler(script_path + os.sep + PixivConstant.PIXIVUTIL_LOG_FILE,
+        __logHandler__ = logging.handlers.RotatingFileHandler(logfilename,
                                                               maxBytes=PixivConstant.PIXIVUTIL_LOG_SIZE,
                                                               backupCount=PixivConstant.PIXIVUTIL_LOG_COUNT,
                                                               encoding="utf-8")
