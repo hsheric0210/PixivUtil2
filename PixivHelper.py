@@ -79,8 +79,7 @@ def get_logger(level=logging.DEBUG):
         logfilename = _logpath
         if logfilename is None or len(logfilename) == 0:
             logfilename = module_path() + os.sep + PixivConstant.PIXIVUTIL_LOG_FILE
-        safePrint('log file: %s' % logfilename)
-        traceback.print_stack()
+        safePrint('Log file: %s' % logfilename)
         logger = logging.getLogger('PixivUtil' + PixivConstant.PIXIVUTIL_VERSION)
         logger.setLevel(level)
         __logHandler__ = logging.handlers.RotatingFileHandler(logfilename,
