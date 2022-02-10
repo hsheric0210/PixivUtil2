@@ -739,7 +739,7 @@ class PixivBrowser(mechanize.Browser):
             else:
                 raise PixivException(msg, errorCode=PixivException.OTHER_MEMBER_ERROR, htmlPage=errorMessage)
 
-    def getMemberPage(self, member_id, page=1, bookmark=False, tags=None, r18mode=False, throw_empty_error=False) -> Tuple[PixivArtist, str]:
+    def getMemberPage(self, member_id, page=1, bookmark=False, tags=None, r18mode=False, throw_empty_error=False, no_logs=False) -> Tuple[PixivArtist, str]:
         artist = None
         response = None
         if tags is None:
@@ -765,7 +765,8 @@ class PixivBrowser(mechanize.Browser):
                 url = f'https://www.pixiv.net/ajax/user/{member_id}/profile/all'
                 need_to_slice = True
 
-            PixivHelper.print_and_log('info', f'Member Url: {url}')
+            if not no_logs:
+                PixivHelper.print_and_log('info', f'Member Url: {url}')
 
         if url is not None:
             # cache the response
