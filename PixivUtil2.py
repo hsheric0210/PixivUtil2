@@ -1639,7 +1639,7 @@ def main():
 
     dbfile = options.dblocation
     if dbfile is None:
-        dbfile = __config__.dbfile
+        dbfile = __config__.dbPath
 
     PixivHelper.set_log_level(__config__.logLevel)
     if __br__ is None:
