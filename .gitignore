@@ -61,3 +61,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 Error*
+databases/*
+logs/*
+memberdata.txt
+ParallelPixivUtil2*
+parallel.ini
