@@ -75,6 +75,7 @@ UTF8_FS = None
 
 __config__ = PixivConfig.PixivConfig()
 configfile = "config.ini"
+dbfile = "db.sqlite"
 __dbManager__ = None
 __br__: PixivBrowserFactory.PixivBrowser = None
 __blacklistTags = list()
@@ -187,6 +188,7 @@ def menu():
     print(' e. Export online followed artist.')
     print(' m. Export online other\'s followed artist.')
     print(' p. Export online image bookmarks.')
+    print(' q. Dump member informations')
     print(' i. Import list file')
     print(' u. Ugoira re-encode')
     print(' r. Reload config.ini')
@@ -843,8 +845,8 @@ def menu_export_online_user_bookmark(opisvalid, args, options):
     PixivBookmarkHandler.export_bookmark(sys.modules[__name__], __config__, filename, 'n', 1, 0, member_id)
 
 
-def menu_export_online_member(opisvalid, args, options):
-    __log__.info('Query & Export Member mode (q).')
+def menu_dump_member_infos(opisvalid, args, options):
+    __log__.info('Dump Member informations mode (q).')
     filename = "memberdata.txt"
     member_ids = list()
 
@@ -1271,6 +1273,9 @@ d  - Manage database''')
     parser.add_option('-c', '--config', dest='configlocation',
                       default=None,
                       help='Load the config file from a custom location')
+    parser.add_option('--db', '--database', dest='dblocation',
+                      default=None,
+                      help='Save/Load the database file from/to a custom location')
     parser.add_option('--bf', '--batch_file',
                       dest='batch_file',
                       default=None,
@@ -1461,7 +1466,7 @@ def main_loop(ewd, op_is_valid, selection, np_is_valid_local, args, options):
             elif selection == 'u':
                 menu_ugoira_reencode(op_is_valid, args, options)
             elif selection == 'q':
-                menu_export_online_member(op_is_valid, args, options)
+                menu_dump_member_infos(op_is_valid, args, options)
             elif selection == 'd':
                 __dbManager__.main()
             elif selection == 'r':
@@ -1586,6 +1591,7 @@ def main():
     global __dbManager__
     global __valid_options
     global __log__
+    global dbfile
 
     parser = setup_option_parser()
     (options, args) = parser.parse_args()
@@ -1630,6 +1636,10 @@ def main():
         PixivHelper.set_config(__config__)
     except BaseException:
         PixivHelper.print_and_log("error", f'Failed to read configuration from {configfile}.')
+
+    dbfile = options.dblocation
+    if dbfile is None:
+        dbfile = __config__.dbfile
 
     PixivHelper.set_log_level(__config__.logLevel)
     if __br__ is None:
@@ -1678,7 +1688,7 @@ def main():
         PixivHelper.print_and_log("warn", f"Post Processing after download is enabled: {__config__.postProcessingCmd}")
 
     try:
-        __dbManager__ = PixivDBManager(root_directory=__config__.rootDirectory, target=__config__.dbPath)
+        __dbManager__ = PixivDBManager(root_directory=__config__.rootDirectory, target=dbfile)
         __dbManager__.createDatabase()
 
         if __config__.useList:
