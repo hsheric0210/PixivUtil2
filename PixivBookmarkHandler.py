@@ -318,9 +318,13 @@ def get_bookmarks(caller, config, hide, start_page=1, end_page=0, member_id=None
         page_str = page.read().decode('utf8')
         page.close()
 
+        dbfile = caller.dbfile
+        if dbfile is None:
+            dbfile = config.dbPath
+
         bookmarks = PixivBookmark.parseBookmark(page_str,
                                                 root_directory=config.rootDirectory,
-                                                db_path=config.dbPath,
+                                                db_path=dbfile,
                                                 locale=br._locale,
                                                 is_json=is_json)
 
