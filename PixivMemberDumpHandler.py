@@ -11,6 +11,7 @@ from threading import Lock
 
 # from bs4 import BeautifulSoup
 
+
 def export_member_list(caller,
                        config,
                        filename,
@@ -27,8 +28,8 @@ def export_member_list(caller,
                 try:
                     (artist, list_page) = PixivBrowserFactory.getBrowser().getMemberPage(_member_id, 1, False, None, r18mode=config.r18mode, throw_empty_error=False, no_logs=True)
                     with dump_lock:
-                        dumps.append({'member_id': _member_id, 'total_images': artist.totalImages})
-                        print(f"Result for {_member_id}: Name=\"{artist.artistName}\", Total_Images={artist.totalImages}")
+                        dumps.append({'member_id': _member_id, 'total_images': artist.totalImages, 'token': artist.artistToken, 'avatar': artist.artistAvatar})
+                        print(f"Result for member \'{_member_id}\': [name=\"{artist.artistName}\", total_images={artist.totalImages}, token=\"{artist.artistToken}\", avatar=\"{artist.artistAvatar}\"]")
                     break
                 except PixivException as ex:
                     caller.ERROR_CODE = ex.errorCode
@@ -59,7 +60,7 @@ def export_member_list(caller,
             PixivHelper.print_and_log('error', 'Error at export_member_list(): {0}'.format(sys.exc_info()))
             raise
 
-    with ThreadPoolExecutor(max_workers=8) as executor:  # TODO Configurable simultaneous download worker number
+    with ThreadPoolExecutor(max_workers=config.parallelMemberDumpThreads) as executor:
         for member_id in member_ids:
             futures.append(executor.submit(func, member_id))
 
