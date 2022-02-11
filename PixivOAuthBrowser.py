@@ -76,6 +76,7 @@ def login():
     print("1. This will open a new browser to login to Pixiv site to get the code.")
     print("1b. In case the browser will not open, or you are using an headless server, use this link: " + f"{LOGIN_URL}?{urlencode(login_params)}")
     print("1c. You must SPOOF YOUR USER-AGENT to see request 'https://app-api.pixiv.net/web/v1/users/auth/pixiv/" + Fore.GREEN + "callback?" + Style.RESET_ALL + "state=...&code=...'")
+    print(f"    └ Target user-agent: {USER_AGENT}")
     print("    └ To change(spoof) your User-agent, follow these instructions: https://www.searchenginejournal.com/change-user-agent/")
     print("2. Open dev console " + Fore.YELLOW + "(F12)" + Style.RESET_ALL + " and switch to network tab." + Style.RESET_ALL)
     print("3. Enable persistent logging (" + Fore.YELLOW + "\"Preserve log\"" + Style.RESET_ALL + "). " + Style.RESET_ALL)
