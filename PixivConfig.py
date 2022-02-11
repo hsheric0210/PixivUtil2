@@ -116,6 +116,7 @@ class PixivConfig():
         ConfigItem("Settings", "dbPath", ""),
         ConfigItem("Settings", "setLastModified", True),
         ConfigItem("Settings", "useLocalTimezone", False),
+        ConfigItem("Settings", "parallelMemberDumpThreads", 16),
         ConfigItem("Settings", "defaultSketchOption", ""),
 
         ConfigItem("Filename",
@@ -274,6 +275,7 @@ class PixivConfig():
                 try:
                     value = method(item.section, item.option)
                 except (configparser.NoSectionError, configparser.NoOptionError):
+                    print(Fore.RED + 'Config has no such section or option:', f"{item.section}.{item.option}")
                     haveError = True
                     for section in config.sections():
                         try:
@@ -284,7 +286,7 @@ class PixivConfig():
                     if value is None:
                         raise
             except BaseException:
-                print(item.option, "=", item.default)
+                print(Fore.YELLOW + Style.BRIGHT + 'Config value reset to default:', f"{item.section}.{item.option}", '->', item.default)
                 value = item.default
                 haveError = True
 
