@@ -11,7 +11,7 @@ dist*/*
 old/*
 config.ini
 config.ini.error*
-list.txt
+list*.txt
 *.log
 *.bat
 db.sqlite
