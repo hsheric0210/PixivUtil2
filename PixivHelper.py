@@ -1242,24 +1242,24 @@ def check_version(br, config=None):
     if br is None:
         import PixivBrowserFactory
         br = PixivBrowserFactory.getBrowser(config=config)
-    result = br.open_with_retry("https://raw.githubusercontent.com/Nandaka/PixivUtil2/master/PixivConstant.py", retry=3)
-    page = result.read().decode('utf-8')
-    result.close()
-    latest_version_full = re.findall(r"PIXIVUTIL_VERSION = '(\d+)(.*)'", page)
+    #result = br.open_with_retry("https://raw.githubusercontent.com/Nandaka/PixivUtil2/master/PixivConstant.py", retry=3)
+    #page = result.read().decode('utf-8')
+    #result.close()
+    #latest_version_full = re.findall(r"PIXIVUTIL_VERSION = '(\d+)(.*)'", page)
 
-    latest_version_int = int(latest_version_full[0][0])
-    curr_version_int = int(re.findall(r"(\d+)", PixivConstant.PIXIVUTIL_VERSION)[0])
-    is_beta = True if latest_version_full[0][1].find("beta") >= 0 else False
-    if is_beta and not config.notifyBetaVersion:
-        return
-    url = "https://github.com/Nandaka/PixivUtil2/releases"
-    if latest_version_int > curr_version_int:
-        if is_beta:
-            print_and_log("info", "New beta version available: {0}".format(latest_version_full[0]))
-        else:
-            print_and_log("info", "New version available: {0}".format(latest_version_full[0]))
-        if config.openNewVersion:
-            webbrowser.open_new(url)
+    #latest_version_int = int(latest_version_full[0][0])
+    #curr_version_int = int(re.findall(r"(\d+)", PixivConstant.PIXIVUTIL_VERSION)[0])
+    #is_beta = True if latest_version_full[0][1].find("beta") >= 0 else False
+    #if is_beta and not config.notifyBetaVersion:
+    #    return
+    #url = "https:#github.com/Nandaka/PixivUtil2/releases"
+    #if latest_version_int > curr_version_int:
+    #    if is_beta:
+    #        print_and_log("info", "New beta version available: {0}".format(latest_version_full[0]))
+    #    else:
+    #        print_and_log("info", "New version available: {0}".format(latest_version_full[0]))
+    #    if config.openNewVersion:
+    #        webbrowser.open_new(url)
 
 
 def decode_tags(tags):
