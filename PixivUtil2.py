@@ -850,7 +850,7 @@ def menu_dump_member_infos(opisvalid, args, options):
     filename = "memberdata.txt"
     member_ids = list()
 
-    if opisvalid and len(args) > 2:
+    if opisvalid and len(args) > 1:
         filename = args[0]
 
         for i in range(1, len(args)):
