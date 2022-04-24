@@ -41,6 +41,7 @@ from PixivModelFanbox import FanboxArtist, FanboxPost
 logger = None
 _config = None
 _logpath = None
+aria2_inputfile = None
 __re_manga_index = re.compile(r'_p(\d+)')
 __badchars__ = None
 if platform.system() == 'Windows':
@@ -71,6 +72,9 @@ def set_logpath(logpath):
     global _logpath
     _logpath = logpath
 
+def set_make_aria2_inputfile(_aria2_inputfile):
+    global aria2_inputfile
+    aria2_inputfile = _aria2_inputfile
 
 def get_logger(level=logging.DEBUG):
     '''Set up logging'''
@@ -748,8 +752,18 @@ def makeSubdirs(filename):
         os.makedirs(directory)
 
 
-def download_image(url, filename, res, file_size, overwrite):
+def download_image(url, filename, res, file_size, overwrite, referer):
     ''' Actual download, return the downloaded filesize and saved filename.'''
+
+    if aria2_inputfile is not None:
+        aria2 = open(str(aria2_inputfile), 'a', 1024)
+        aria2.write(url + '\n')
+        aria2.write('  referer=' + referer + '\n')
+        head, tail = os.path.split(filename)
+        aria2.write('  dir=' + head + '\n')
+        aria2.write('  out=' + tail + '\n')
+        return (file_size, filename)
+
     start_time = datetime.now()
 
     # try to save to the given filename + .pixiv extension if possible

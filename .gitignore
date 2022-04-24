@@ -66,3 +66,7 @@ logs/*
 memberdata.txt
 ParallelPixivUtil2*
 parallel.ini
+aria2c.exe
+config.ini.*
+aria2/
+aria2-logs/
