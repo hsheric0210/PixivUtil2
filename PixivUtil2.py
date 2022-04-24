@@ -1219,6 +1219,10 @@ Used in option 3, 5, 7, and 8.''')
                       dest='log_path',
                       default=None,
                       help='''Log File Path. (Example: C:\\PixivUtil2\\Logs\\Log.log)''')
+    parser.add_option('-a', '--aria2',
+                      dest='aria2_inputfile',
+                      default=None,
+                      help='''If specified, PixivUtil2 will make the Aria2 input file with specified name instead of directly downloading image.''')
     return parser
 
 
@@ -1415,6 +1419,11 @@ def main():
     PixivHelper.set_logpath(options.log_path)
     if options.log_path is not None:
         PixivHelper.safePrint('Log file path changed to: %s' % options.log_path)
+
+    PixivHelper.set_make_aria2_inputfile(options.aria2_inputfile)
+    if options.aria2_inputfile is not None:
+        PixivHelper.safePrint('Making Aria2 input file: %s' % options.aria2_inputfile)
+
     __log__ = PixivHelper.get_logger()
 
     op = options.start_action
