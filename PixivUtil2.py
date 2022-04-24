@@ -1400,6 +1400,10 @@ Used in option e, m, p''')
  y - include sketch database.                       \n
  n - don't include sketch database.                 \n
  o - only export sketch database.''')
+    parser.add_option('-a', '--aria2',
+                      dest='aria2_inputfile',
+                      default=None,
+                      help='''If specified, PixivUtil2 will make the Aria2 input file with specified name instead of directly downloading image.''')
     return parser
 
 
@@ -1605,6 +1609,11 @@ def main():
     PixivHelper.set_logpath(options.log_path)
     if options.log_path is not None:
         PixivHelper.safePrint('Log file path changed to: %s' % options.log_path)
+
+    PixivHelper.set_make_aria2_inputfile(options.aria2_inputfile)
+    if options.aria2_inputfile is not None:
+        PixivHelper.safePrint('Making Aria2 input file: %s' % options.aria2_inputfile)
+
     __log__ = PixivHelper.get_logger()
 
     op = options.start_action
