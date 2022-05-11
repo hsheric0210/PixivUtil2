@@ -23,14 +23,12 @@ error*.html
 *.source*/*
 Images/*
 testapp*/*
-.idea/*
+.idea/
 *.bak
 *.pyo
 pixivutil.log*
 .pytest_cache/*
 __pycache__/*
-
-.idea/*
 .vs/*
 blacklist_members.txt
 blacklist_tags.txt
@@ -61,8 +59,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 Error*
-databases/*
-logs/*
+databases/
+logs/
 memberdata.txt
 ParallelPixivUtil2*
 parallel.ini
