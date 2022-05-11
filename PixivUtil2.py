@@ -39,8 +39,6 @@ colorama.init()
 DEBUG_SKIP_PROCESS_IMAGE = False
 DEBUG_SKIP_DOWNLOAD_IMAGE = False
 
-# 방향 선회: ParallelPixivUtil2을 통해 병렬로 실행할 수 있도록 .csv파일의 형태로 member 정보를 저장하는 식으로 진행
-
 if platform.system() == "Windows":
     # patch getpass.getpass() for windows to show '*'
     def win_getpass_with_mask(prompt='Password: ', stream=None):
@@ -190,7 +188,6 @@ def menu():
     print(' e. Export online followed artist.')
     print(' m. Export online other\'s followed artist.')
     print(' p. Export online image bookmarks.')
-    print(' q. Dump member informations')
     print(' q. Dump member informations')
     print(' i. Import list file')
     print(' u. Ugoira re-encode')
