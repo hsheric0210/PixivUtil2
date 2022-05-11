@@ -291,6 +291,8 @@ Please refer run with `--help` for latest information.
                             (required: member_id, optional: --ef=EXPORT_FILENAME)
                         q - Dump member informations
                             (required: filename, list of member ids seperated by space)
+                        q - Dump member informations
+                            (required: filename, list of member ids seperated by space)
                         d - Manage database
   -x, --exitwhendone    Exit programm when done.
                         (only useful when DB-Manager)
