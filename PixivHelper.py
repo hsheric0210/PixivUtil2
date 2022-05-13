@@ -44,7 +44,7 @@ logger = None
 _config = None
 _logpath = None
 aria2_inputfile = None
-zmq_pipe: zmq.backend.Socket = None
+zmq_pipe = None
 zmq_pipe_poller = None
 __re_manga_index = re.compile(r'_p(\d+)')
 __badchars__ = None
@@ -1283,14 +1283,15 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
         # progress report
         print_and_log('debug', f"Start re_encoding image {im_path}")
         p = ffmpeg_progress_report(p)
-        p.wait()
-        ret = p.returncode
+        ret = p.wait()
 
     if ret is None:
         return
 
-    if(ret != 0):
-        raise PixivException("error", f"Failed when converting image using {cmd} ==> ffmpeg return exit code={p.returncode}, expected to return 0.", errorCode=PixivException.OTHER_ERROR)
+    if ret != 0:
+        raise PixivException("error", f"Failed when converting image using {cmd} ==> ffmpeg return exit code={ret}, expected to return 0.", errorCode=PixivException.OTHER_ERROR)
+    else:
+        print_and_log("info", f"- Done with status = {ret}")
 
     if os.path.exists(im_path) and os.path.exists(temp_name):
         try:

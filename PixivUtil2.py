@@ -741,13 +741,22 @@ def menu_ugoira_reencode(opisvalid, args, options):
     PixivHelper.print_and_log(None, msg)
     msg = Fore.YELLOW + Style.NORMAL + f'You are about to re-encode and overwrite all of your ugoira based on its zip file.' + Style.RESET_ALL
     PixivHelper.print_and_log(None, msg)
-    arg = input(Fore.YELLOW + Style.BRIGHT + 'Do you really want to proceed ? [y/n, default is no]: ' + Style.RESET_ALL).rstrip("\r") or 'n'
-    sure = arg.lower()
-    if sure not in ('y', 'n'):
-        PixivHelper.print_and_log("error", f"Invalid args for ugoira reencode: {arg}, valid values are [y/n].")
-        return
-    if sure == 'y':
-        PixivImageHandler.process_ugoira_local(sys.modules[__name__], __config__)
+
+    subfolder_name = None
+    if opisvalid and len(args) > 0:
+        subfolder_name = args[0]
+    else:
+        subfolder_name = input("Subfolder name (default: global): ").rstrip("\r") or subfolder_name
+
+        arg = input(Fore.YELLOW + Style.BRIGHT + 'Do you really want to proceed ? [y/n, default is no]: ' + Style.RESET_ALL).rstrip("\r") or 'n'
+        sure = arg.lower()
+        if sure not in ('y', 'n'):
+            PixivHelper.print_and_log("error", f"Invalid args for ugoira reencode: {arg}, valid values are [y/n].")
+            return
+        if sure != 'y':
+            return
+
+    PixivImageHandler.process_ugoira_local(sys.modules[__name__], __config__, subfolder_name)
 
 
 def menu_export_database_images(opisvalid, args, options):
@@ -1225,7 +1234,7 @@ def setup_option_parser():
     __valid_options = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18',
                        'f1', 'f2', 'f3', 'f4', 'f5',
                        's1', 's2',
-                       'l', 'd', 'e', 'm', 'q', 'b', 'p', 'c')
+                       'l', 'd', 'e', 'm', 'q', 'b', 'p', 'c', 'u')
     parser = OptionParser()
 
     # need to keep the whitespace to adjust the output for --help

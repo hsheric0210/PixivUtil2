@@ -439,8 +439,10 @@ def process_manga_series(caller,
         PixivHelper.print_and_log('error', f'Exception: {sys.exc_info()}')
         raise
 
-def process_ugoira_local(caller, config):
+def process_ugoira_local(caller, config, subfolder_name):
     directory = config.rootDirectory
+    if subfolder_name is not None:
+        directory = os.path.join(directory, subfolder_name)
     counter = 0
 
     try:
