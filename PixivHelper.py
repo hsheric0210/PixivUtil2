@@ -37,11 +37,14 @@ from PixivException import PixivException
 import PixivArtist
 from PixivImage import PixivImage
 from PixivModelFanbox import FanboxArtist, FanboxPost
+import zmq
 
 logger = None
 _config = None
 _logpath = None
 aria2_inputfile = None
+zmq_pipe: zmq.backend.Socket = None
+zmq_pipe_poller = None
 __re_manga_index = re.compile(r'_p(\d+)')
 __badchars__ = None
 if platform.system() == 'Windows':
@@ -72,9 +75,37 @@ def set_logpath(logpath):
     global _logpath
     _logpath = logpath
 
+
 def set_make_aria2_inputfile(_aria2_inputfile):
     global aria2_inputfile
     aria2_inputfile = _aria2_inputfile
+
+
+def create_pipe(_pipe_name):
+    global zmq_pipe
+    global zmq_pipe_poller
+    if _pipe_name is None:
+        return
+    ctx = zmq.Context()
+    try:
+        zmq_pipe = ctx.socket(zmq.REQ)
+        zmq_pipe.connect(_pipe_name)
+        zmq_pipe.send_multipart([b"HS", b"PixivUtil2"])
+        zmq_pipe_poller = zmq.Poller()
+        zmq_pipe_poller.register(zmq_pipe, zmq.POLLIN)
+        events = dict(zmq_pipe_poller.poll(3000))
+        if events and events.get(zmq_pipe) == zmq.POLLIN:
+            recv = zmq_pipe.recv_multipart(zmq.NOBLOCK)
+            if recv[0] != b"HS":
+                print_and_log('error', "Invalid response from pipe connection: '%s'" % recv)
+                raise ConnectionError(None, '0MQ connection not properly established', recv, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+        else:
+            raise ConnectionError(None, '0MQ connection timed out', 3000, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+        print_and_log('warn', '0MQ Pipe connected to: %s' % recv[1].decode())
+    except Exception as ex:
+        print_and_log('error', 'Pipe connection error', ex)
+        raise ConnectionError(None, '0MQ connection not properly established', ex, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+
 
 def get_logger(level=logging.DEBUG):
     '''Set up logging'''
@@ -1023,6 +1054,14 @@ def ugoira2webm(ugoira_file, exportname, codec="libvpx-vp9", extension="webm", i
                    image=image)
 
 
+def ipc_recv(timeout):
+    events = dict(zmq_pipe_poller.poll(timeout))
+    if events and events.get(zmq_pipe) == zmq.POLLIN:
+        return zmq_pipe.recv_multipart(zmq.NOBLOCK)
+    else:
+        raise ConnectionError(None, '0MQ connection timed out', 2000, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+
+
 def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, image=None):
     ''' modified based on https://github.com/tsudoko/ugoira-tools/blob/master/ugoira2webm/ugoira2webm.py '''
     # if not os.path.exists(os.path.abspath(ffmpeg)):
@@ -1036,9 +1075,9 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
 
     tempname = d + "/temp." + extension
 
-    cmd = f"{ffmpeg} -y -safe 0 -i \"{d}/i.ffconcat\" -c:v {codec} {param} \"{tempname}\""
+    cmd = f"-y -safe 0 -i \"{d}/i.ffconcat\" -c:v {codec} {param} \"{tempname}\""
     if codec is None:
-        cmd = f"{ffmpeg} -y -safe 0 -i \"{d}/i.ffconcat\" {param} \"{tempname}\""
+        cmd = f"-y -safe 0 -i \"{d}/i.ffconcat\" {param} \"{tempname}\""
 
     try:
         frames = {}
@@ -1062,16 +1101,44 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
 
         check_image_encoding(d)
 
-        ffmpeg_args = shlex.split(cmd)
-        get_logger().info(f"[convert_ugoira()] running with cmd: {cmd}")
-        p = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)
+        if zmq_pipe is not None:
+            ffmpeg_args = shlex.split(cmd)
 
-        # progress report
-        print_and_log('info', f"Start encoding {exportname}")
-        p = ffmpeg_progress_report(p)
-        ret = p.wait()
+            print_and_log('info', f"[convert_ugoira()] sending cmd to 0MQ pipe: {cmd}")
+            ffmpeg_encoded_args = []
+            for arg in ffmpeg_args:
+                ffmpeg_encoded_args.append(arg.encode())
 
-        if(p.returncode != 0):
+            ret = None
+            trial = 5
+            while trial > 0:
+                try:
+                    zmq_pipe.send_multipart([b"FFmpeg"] + ffmpeg_encoded_args)
+
+                    print_and_log('info', "[convert_ugoira()] waiting cmd to be executed")
+
+                    resp = ipc_recv(None)
+                    if resp[0] == b"FFmpeg":
+                        ret = int.from_bytes(resp[1], byteorder=sys.byteorder, signed=True)
+                        break
+                except Exception as ex:
+                    print_and_log('error', f"0MQ ipc not responding", ex)
+                    trial -= 1
+
+            if ret is None:
+                return
+        else:
+            ffmpeg_args = shlex.split(f"{ffmpeg} {cmd}")
+            print_and_log('info', f"[convert_ugoira()] running with cmd: {cmd}")
+
+            p = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)
+
+            # progress report
+            print_and_log('info', f"Start encoding {exportname}")
+            p = ffmpeg_progress_report(p)
+            ret = p.wait()
+
+        if ret != 0:
             print_and_log("error", f"Failed when converting image using {cmd} ==> ffmpeg return exit code={p.returncode}, expected to return 0.")
         else:
             print_and_log("info", f"- Done with status = {ret}")
@@ -1187,19 +1254,46 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
 
     split_tup = os.path.splitext(im_path)
     temp_name = f"{split_tup[0]}_temp{split_tup[1]}"
-    # Fix #1126
-    cmd = f"{_config.ffmpeg} -i {im_path} -pix_fmt {pix_fmt_nb_components[nb_channel]} {temp_name}"
+    cmd = f"ffmpeg -i {im_path} -pix_fmt {pix_fmt_nb_components[nb_channel]} {temp_name}"
 
-    ffmpeg_args = shlex.split(cmd)
-    get_logger().info(f"[re_encode_image()] running with cmd: {cmd}")
-    p = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)
+    ret = None
+    if zmq_pipe is not None:
+        ffmpeg_args = shlex.split(cmd)
 
-    # progress report
-    print_and_log('debug', f"Start re_encoding image {im_path}")
-    p = ffmpeg_progress_report(p)
-    p.wait()
+        print_and_log('info', f"[re_encode_image()] sending cmd to 0MQ pipe: {cmd}")
+        ffmpeg_encoded_args = []
+        for arg in ffmpeg_args:
+            ffmpeg_encoded_args.append(arg.encode())
 
-    if(p.returncode != 0):
+        trial = 5
+        while trial > 0:
+            try:
+                zmq_pipe.send_multipart([b"FFmpeg"] + ffmpeg_encoded_args)
+
+                print_and_log('info', "[re_encode_image()] waiting cmd to be executed")
+
+                resp = ipc_recv(None)
+                if resp[0] == b"FFmpeg":
+                    ret = int.from_bytes(resp[1], byteorder=sys.byteorder, signed=True)
+                    break
+            except Exception as ex:
+                print_and_log('error', f"0MQ ipc not responding", ex)
+                trial -= 1
+    else:
+        ffmpeg_args = shlex.split(f"{_config.ffmpeg} {cmd}")
+        get_logger().info(f"[re_encode_image()] running with cmd: {cmd}")
+        p = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)
+
+        # progress report
+        print_and_log('debug', f"Start re_encoding image {im_path}")
+        p = ffmpeg_progress_report(p)
+        p.wait()
+        ret = p.returncode
+
+    if ret is None:
+        return
+
+    if(ret != 0):
         raise PixivException("error", f"Failed when converting image using {cmd} ==> ffmpeg return exit code={p.returncode}, expected to return 0.", errorCode=PixivException.OTHER_ERROR)
 
     if os.path.exists(im_path) and os.path.exists(temp_name):

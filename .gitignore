@@ -68,3 +68,4 @@ aria2c.exe
 config.ini.*
 aria2/
 aria2-logs/
+log4net.config

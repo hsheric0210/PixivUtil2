@@ -1404,6 +1404,10 @@ Used in option e, m, p''')
                       dest='aria2_inputfile',
                       default=None,
                       help='''If specified, PixivUtil2 will make the Aria2 input file with specified name instead of directly downloading image.''')
+    parser.add_option('--pipe',
+                      dest='pipe_name',
+                      default=None,
+                      help='''If specified, PixivUtil2 will connect the 0MQ socket for IPC.''')
     return parser
 
 
@@ -1615,6 +1619,10 @@ def main():
         PixivHelper.safePrint('Making Aria2 input file: %s' % options.aria2_inputfile)
 
     __log__ = PixivHelper.get_logger()
+
+    PixivHelper.create_pipe(options.pipe_name)
+    if options.pipe_name is not None:
+        PixivHelper.safePrint('Using 0MG pipe: %s' % options.pipe_name)
 
     op = options.start_action
     if op in __valid_options:
