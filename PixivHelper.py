@@ -8,6 +8,7 @@ import logging
 import logging.handlers
 import os
 import platform
+import posixpath
 import random
 import re
 import shlex
@@ -1119,7 +1120,7 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
             print_and_log('info', f"[convert_ugoira()] sending cmd to 0MQ pipe: {cmd}")
             ffmpeg_encoded_args = []
             for arg in ffmpeg_args:
-                ffmpeg_encoded_args.append(arg.encode())
+                ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
 
             ret = None
             trial = 5
@@ -1207,7 +1208,7 @@ def check_image_encoding(directory: str) -> None:
 
     # Append every images to their corresponding number of bit depth in a dictionnary
     for filename in os.listdir(directory):
-        f = os.path.join(directory, filename)
+        f = posixpath.join(directory, filename)
         # checking if it is a file
         if ((os.path.isfile(f)) and (f.endswith((".jpg", ".png")))):
             fp = None
@@ -1258,7 +1259,7 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
         print_and_log('info', f"[re_encode_image()] sending cmd to 0MQ pipe: {cmd}")
         ffmpeg_encoded_args = []
         for arg in ffmpeg_args:
-            ffmpeg_encoded_args.append(arg.encode())
+            ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
 
         trial = 5
         while trial > 0:
