@@ -362,6 +362,7 @@ def process_image(caller,
         gc.collect()
         PixivHelper.print_and_log(None, '\n')
 
+        PixivHelper.ipc_notify([b"DL", int(image_id).to_bytes(8, 'big'), int(result).to_bytes(4, 'big')])
         return result
     except Exception as ex:
         if isinstance(ex, KeyboardInterrupt):

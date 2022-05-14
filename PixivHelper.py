@@ -1055,12 +1055,30 @@ def ugoira2webm(ugoira_file, exportname, codec="libvpx-vp9", extension="webm", i
                    image=image)
 
 
-def ipc_recv(timeout):
+def ipc_recv(timeout, silent=False):
+    if zmq_pipe is None or zmq_pipe_poller is None:
+        return None
     events = dict(zmq_pipe_poller.poll(timeout))
     if events and events.get(zmq_pipe) == zmq.POLLIN:
         return zmq_pipe.recv_multipart(zmq.NOBLOCK)
-    else:
+    elif not silent:
         raise ConnectionError(None, '0MQ connection timed out', 2000, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+
+
+def ipc_send(msg, silent=False):
+    if zmq_pipe is not None:
+        try:
+            zmq_pipe.send_multipart(msg)
+            return True
+        except Exception as ex:
+            if not silent:
+                raise ConnectionError(None, '0MQ connection not valid', ex, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+    return False
+
+
+def ipc_notify(msg):
+    if ipc_send(msg, True):
+        ipc_recv(1000, True)
 
 
 def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, image=None):
@@ -1126,7 +1144,7 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
             trial = 5
             while trial > 0:
                 try:
-                    zmq_pipe.send_multipart([b"FFmpeg"] + ffmpeg_encoded_args)
+                    ipc_send([b"FFmpeg"] + ffmpeg_encoded_args)
 
                     print_and_log('info', "[convert_ugoira()] waiting cmd to be executed")
 
@@ -1264,7 +1282,7 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
         trial = 5
         while trial > 0:
             try:
-                zmq_pipe.send_multipart([b"FFmpeg"] + ffmpeg_encoded_args)
+                ipc_send([b"FFmpeg"] + ffmpeg_encoded_args)
 
                 print_and_log('info', "[re_encode_image()] waiting cmd to be executed")
 
