@@ -427,6 +427,10 @@ def safePrint(msg, newline=True, end=None):
 
 
 def set_console_title(title):
+    # Redirect title to IPC if available
+    if zmq_pipe is not None:
+        ipc_notify([b"TITLE", title.encode(encoding='utf-8')])
+        return
     try:
         if platform.system() == "Windows":
             subprocess.call('title' + ' ' + title, shell=True)
