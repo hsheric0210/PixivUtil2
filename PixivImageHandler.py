@@ -365,6 +365,7 @@ def process_image(caller,
         gc.collect()
         PixivHelper.print_and_log(None, '\n')
 
+        PixivHelper.ipc_notify([b"DL", int(image_id).to_bytes(8, 'big'), int(result).to_bytes(4, 'big')])
         return result
     except Exception as ex:
         if isinstance(ex, KeyboardInterrupt):
@@ -442,8 +443,10 @@ def process_manga_series(caller,
         PixivHelper.print_and_log('error', f'Exception: {sys.exc_info()}')
         raise
 
-def process_ugoira_local(caller, config):
+def process_ugoira_local(caller, config, subfolder_name):
     directory = config.rootDirectory
+    if subfolder_name is not None:
+        directory = os.path.join(directory, subfolder_name)
     counter = 0
     d = ""
     res = None

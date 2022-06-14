@@ -46,6 +46,7 @@ def process_member(caller,
             PixivHelper.print_and_log('info', 'Number of page setting will be ignored')
     elif config.numberOfPage != 0:
         PixivHelper.print_and_log('info', f'End Page from config: {config.numberOfPage}')
+    PixivHelper.ipc_notify([b"IDENT", f"{member_id}.({page}-{end_page})".encode(encoding='utf-8')])
 
     # calculate the offset for display properties
     offset = 48  # new offset for AJAX call

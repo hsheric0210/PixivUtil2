@@ -8,6 +8,7 @@ import logging
 import logging.handlers
 import os
 import platform
+import posixpath
 import random
 import re
 import shlex
@@ -43,7 +44,7 @@ logger = None
 _config = None
 _logpath = None
 aria2_inputfile = None
-zmq_pipe: zmq.backend.Socket = None
+zmq_pipe = None
 zmq_pipe_poller = None
 __re_manga_index = re.compile(r'_p(\d+)')
 __badchars__ = None
@@ -426,6 +427,10 @@ def safePrint(msg, newline=True, end=None):
 
 
 def set_console_title(title):
+    # Redirect title to IPC if available
+    if zmq_pipe is not None:
+        ipc_notify([b"TITLE", title.encode(encoding='utf-8')])
+        return
     try:
         if platform.system() == "Windows":
             subprocess.call('title' + ' ' + title, shell=True)
@@ -736,13 +741,16 @@ def check_file_exists(overwrite, filename, file_size, old_size, backup_old_file)
     if not overwrite and int(file_size) == old_size:
         print_and_log('warn', f"\tFile exist! (Identical Size) ==> {filename}.")
         return PixivConstant.PIXIVUTIL_SKIP_DUPLICATE
+    elif not overwrite and file_size < 0:
+        print_and_log('warn', f"\tFound file but remote file size is not available ==> {filename}.")
+        return PixivConstant.PIXIVUTIL_SKIP_DUPLICATE
     else:
         if backup_old_file:
             split_name = filename.rsplit(".", 1)
             new_name = filename + "." + str(int(time.time()))
             if len(split_name) == 2:
                 new_name = split_name[0] + "." + str(int(time.time())) + "." + split_name[1]
-            print_and_log('warn', f"\t Found file with different file size ==> {filename}, backing up to: {new_name}.")
+            print_and_log('warn', f"\tFound file with different file size ==> {filename}, backing up to: {new_name}.")
             os.rename(filename, new_name)
         else:
             print_and_log('warn', f"\tFound file with different file size ==> {filename}, removing old file (old: {old_size} vs new: {file_size})")
@@ -1054,12 +1062,30 @@ def ugoira2webm(ugoira_file, exportname, codec="libvpx-vp9", extension="webm", i
                    image=image)
 
 
-def ipc_recv(timeout):
+def ipc_recv(timeout, silent=False):
+    if zmq_pipe is None or zmq_pipe_poller is None:
+        return None
     events = dict(zmq_pipe_poller.poll(timeout))
     if events and events.get(zmq_pipe) == zmq.POLLIN:
         return zmq_pipe.recv_multipart(zmq.NOBLOCK)
-    else:
+    elif not silent:
         raise ConnectionError(None, '0MQ connection timed out', 2000, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+
+
+def ipc_send(msg, silent=False):
+    if zmq_pipe is not None:
+        try:
+            zmq_pipe.send_multipart(msg)
+            return True
+        except Exception as ex:
+            if not silent:
+                raise ConnectionError(None, '0MQ connection not valid', ex, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+    return False
+
+
+def ipc_notify(msg):
+    if ipc_send(msg, True):
+        ipc_recv(1000, True)
 
 
 def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, image=None):
@@ -1067,7 +1093,19 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
     # if not os.path.exists(os.path.abspath(ffmpeg)):
     #     raise PixivException(f"Cannot find ffmpeg executables => {ffmpeg}", errorCode=PixivException.MISSING_CONFIG)
 
-    d = create_temp_dir(prefix="convert_ugoira")
+    d = tempfile.mkdtemp(prefix="convert_ugoira")
+    d = d.replace(os.sep, '/')
+
+    # Issue #1035
+    if not os.path.exists(d):
+        new_temp = os.path.abspath(f"ugoira_{int(datetime.now().timestamp())}")
+        new_temp = new_temp.replace(os.sep, '/')
+        os.makedirs(new_temp)
+        print_and_log("warn", f"Cannot create temp folder at {d}, using current folder as the temp location => {new_temp}")
+        d = new_temp
+        # check again if still fail
+        if not os.path.exists(d):
+            raise PixivException(f"Cannot create temp folder => {d}", errorCode=PixivException.OTHER_ERROR)
 
     if exportname is None or len(exportname) == 0:
         name = '.'.join(ugoira_file.split('.')[:-1])
@@ -1107,13 +1145,13 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
             print_and_log('info', f"[convert_ugoira()] sending cmd to 0MQ pipe: {cmd}")
             ffmpeg_encoded_args = []
             for arg in ffmpeg_args:
-                ffmpeg_encoded_args.append(arg.encode())
+                ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
 
             ret = None
             trial = 5
             while trial > 0:
                 try:
-                    zmq_pipe.send_multipart([b"FFmpeg"] + ffmpeg_encoded_args)
+                    ipc_send([b"FFmpeg"] + ffmpeg_encoded_args)
 
                     print_and_log('info', "[convert_ugoira()] waiting cmd to be executed")
 
@@ -1158,23 +1196,6 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
         print()
 
 
-def create_temp_dir(prefix: str = None) -> str:
-    d = tempfile.mkdtemp(prefix=prefix)
-    d = d.replace(os.sep, '/')
-
-    # Issue #1035
-    if not os.path.exists(d):
-        new_temp = os.path.abspath(f"file_{int(datetime.now().timestamp())}")
-        new_temp = new_temp.replace(os.sep, '/')
-        os.makedirs(new_temp)
-        print_and_log("warn", f"Cannot create temp folder at {d}, using current folder as the temp location => {new_temp}")
-        d = new_temp
-        # check again if still fail
-        if not os.path.exists(d):
-            raise PixivException(f"Cannot create temp folder => {d}", errorCode=PixivException.OTHER_ERROR)
-    return d
-
-
 def ffmpeg_progress_report(p: subprocess.Popen) -> subprocess.Popen:
     chatter = ""
     while p.stderr:
@@ -1212,7 +1233,7 @@ def check_image_encoding(directory: str) -> None:
 
     # Append every images to their corresponding number of bit depth in a dictionnary
     for filename in os.listdir(directory):
-        f = os.path.join(directory, filename)
+        f = posixpath.join(directory, filename)
         # checking if it is a file
         if ((os.path.isfile(f)) and (f.endswith((".jpg", ".png")))):
             fp = None
@@ -1254,7 +1275,7 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
 
     split_tup = os.path.splitext(im_path)
     temp_name = f"{split_tup[0]}_temp{split_tup[1]}"
-    cmd = f"ffmpeg -i {im_path} -pix_fmt {pix_fmt_nb_components[nb_channel]} {temp_name}"
+    cmd = f"-i {im_path} -pix_fmt {pix_fmt_nb_components[nb_channel]} {temp_name}"
 
     ret = None
     if zmq_pipe is not None:
@@ -1263,12 +1284,12 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
         print_and_log('info', f"[re_encode_image()] sending cmd to 0MQ pipe: {cmd}")
         ffmpeg_encoded_args = []
         for arg in ffmpeg_args:
-            ffmpeg_encoded_args.append(arg.encode())
+            ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
 
         trial = 5
         while trial > 0:
             try:
-                zmq_pipe.send_multipart([b"FFmpeg"] + ffmpeg_encoded_args)
+                ipc_send([b"FFmpeg"] + ffmpeg_encoded_args)
 
                 print_and_log('info', "[re_encode_image()] waiting cmd to be executed")
 
@@ -1280,21 +1301,22 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
                 print_and_log('error', f"0MQ ipc not responding", ex)
                 trial -= 1
     else:
-        ffmpeg_args = shlex.split(f"{_config.ffmpeg} {cmd}")
+        ffmpeg_args = shlex.split(f"ffmpeg {cmd}")
         get_logger().info(f"[re_encode_image()] running with cmd: {cmd}")
         p = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)
 
         # progress report
         print_and_log('debug', f"Start re_encoding image {im_path}")
         p = ffmpeg_progress_report(p)
-        p.wait()
-        ret = p.returncode
+        ret = p.wait()
 
     if ret is None:
         return
 
-    if(ret != 0):
-        raise PixivException("error", f"Failed when converting image using {cmd} ==> ffmpeg return exit code={p.returncode}, expected to return 0.", errorCode=PixivException.OTHER_ERROR)
+    if ret != 0:
+        raise PixivException("error", f"Failed when converting image using {cmd} ==> ffmpeg return exit code={ret}, expected to return 0.", errorCode=PixivException.OTHER_ERROR)
+    else:
+        print_and_log("info", f"- Done with status = {ret}")
 
     if os.path.exists(im_path) and os.path.exists(temp_name):
         try:
