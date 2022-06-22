@@ -795,12 +795,22 @@ def download_image(url, filename, res, file_size, overwrite, referer):
     ''' Actual download, return the downloaded filesize and saved filename.'''
 
     if aria2_inputfile is not None:
-        aria2 = open(str(aria2_inputfile), 'a', 1024)
-        aria2.write(url + '\n')
-        aria2.write('  referer=' + referer + '\n')
-        head, tail = os.path.split(filename)
-        aria2.write('  dir=' + head + '\n')
-        aria2.write('  out=' + tail + '\n')
+        # we have 100(!) chances
+        trial = 100
+        while trial > 0:
+            try:
+                with open(os.path.normpath(str(aria2_inputfile)), 'a', 1024) as aria2:
+                    aria2.write(url + '\n')
+                    aria2.write('  referer=' + referer + '\n')
+                    head, tail = os.path.split(filename)
+                    aria2.write('  dir=' + head + '\n')
+                    aria2.write('  out=' + tail + '\n')
+                print_and_log('info', f"[aria2] Successfully wrote input file, within {trial} trial(s) left")
+                break
+            # sometimes PermissionError is raised due to simultaneous open request of a file
+            except OSError as ex:
+                trial -= 1
+                print_and_log('error', f"[aria2] Failed to write input file, {trial} trial(s) left")
         return (file_size, filename)
 
     start_time = datetime.now()
@@ -1072,6 +1082,13 @@ def ipc_recv(timeout, silent=False):
         raise ConnectionError(None, '0MQ connection timed out', 2000, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
 
 
+def ipc_recv_response(resp_name, timeout, silent=False):
+    while True:
+        response = ipc_recv(timeout, silent)
+        if response is not None and response[0] == resp_name:
+            return response
+
+
 def ipc_send(msg, silent=False):
     if zmq_pipe is not None:
         try:
@@ -1086,6 +1103,38 @@ def ipc_send(msg, silent=False):
 def ipc_notify(msg):
     if ipc_send(msg, True):
         ipc_recv(1000, True)
+
+
+def requestIPCtoRunFFmpeg(method_name, cmd):
+    print_and_log('info', f"[{method_name}] sending cmd to 0MQ pipe: {cmd}")
+
+    # split and encode ffmpeg arguments
+    ffmpeg_encoded_args = []
+    for arg in shlex.split(cmd):
+        ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
+
+    # we have 5 chances
+    trial = 5
+    while trial > 0:
+        try:
+            # enqueue execution and query the task id
+            ipc_send([b"FFmpeg_Req"] + ffmpeg_encoded_args)
+            print_and_log('info', f'[{method_name}] requested execution')
+            [_, task_id] = ipc_recv_response(b"FFmpeg_Req", 3000)
+            # query the ffmpeg exit code with given task id (this will block the execution until the ffmpeg process is finished)
+            print_and_log('info', f'[{method_name}] waiting cmd to be executed (task_id={task_id})')
+            ipc_send([b"FFmpeg_Ret"] + task_id)
+            print_and_log('info', f'[{method_name}] requested execution exit code (task_id={task_id})')
+            [_, exit_code] = ipc_recv_response(b"FFmpeg_Ret", None)
+            _exit_code = int.from_bytes(exit_code, byteorder=sys.byteorder, signed=True)
+            # negative exit code means there's no ffmpeg execution found with given task id, which is unexpected situation at this time
+            if _exit_code > 0:
+                print_and_log('info', f"[{method_name}] received execution exit code '{_exit_code}' (task_id={task_id})")
+                return _exit_code
+        except Exception as ex:
+            trial -= 1
+            print_and_log('error', f"[{method_name}] 0MQ ipc not responding, {trial} trial(s) left")
+    return None
 
 
 def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, image=None):
@@ -1140,29 +1189,7 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
         check_image_encoding(d)
 
         if zmq_pipe is not None:
-            ffmpeg_args = shlex.split(cmd)
-
-            print_and_log('info', f"[convert_ugoira()] sending cmd to 0MQ pipe: {cmd}")
-            ffmpeg_encoded_args = []
-            for arg in ffmpeg_args:
-                ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
-
-            ret = None
-            trial = 5
-            while trial > 0:
-                try:
-                    ipc_send([b"FFmpeg"] + ffmpeg_encoded_args)
-
-                    print_and_log('info', "[convert_ugoira()] waiting cmd to be executed")
-
-                    resp = ipc_recv(None)
-                    if resp[0] == b"FFmpeg":
-                        ret = int.from_bytes(resp[1], byteorder=sys.byteorder, signed=True)
-                        break
-                except Exception as ex:
-                    print_and_log('error', f"0MQ ipc not responding", ex)
-                    trial -= 1
-
+            ret = requestIPCtoRunFFmpeg("convert_ugoira()", cmd)
             if ret is None:
                 return
         else:
@@ -1279,27 +1306,7 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
 
     ret = None
     if zmq_pipe is not None:
-        ffmpeg_args = shlex.split(cmd)
-
-        print_and_log('info', f"[re_encode_image()] sending cmd to 0MQ pipe: {cmd}")
-        ffmpeg_encoded_args = []
-        for arg in ffmpeg_args:
-            ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
-
-        trial = 5
-        while trial > 0:
-            try:
-                ipc_send([b"FFmpeg"] + ffmpeg_encoded_args)
-
-                print_and_log('info', "[re_encode_image()] waiting cmd to be executed")
-
-                resp = ipc_recv(None)
-                if resp[0] == b"FFmpeg":
-                    ret = int.from_bytes(resp[1], byteorder=sys.byteorder, signed=True)
-                    break
-            except Exception as ex:
-                print_and_log('error', f"0MQ ipc not responding", ex)
-                trial -= 1
+        ret = requestIPCtoRunFFmpeg("re_encode_image()", cmd)
     else:
         ffmpeg_args = shlex.split(f"ffmpeg {cmd}")
         get_logger().info(f"[re_encode_image()] running with cmd: {cmd}")
