@@ -1128,10 +1128,8 @@ def requestIPCtoRunFFmpeg(method_name, cmd):
     [_, exit_code] = ipc_recv(ipc_task, ipc_task_poller, None)
     _exit_code = int.from_bytes(exit_code, byteorder=sys.byteorder, signed=True)
     # negative exit code means there's no ffmpeg execution found with given task id, which is unexpected situation at this time
-    if _exit_code > 0:
-        print_and_log('info', f"[{method_name}] received execution exit code '{_exit_code}' (task_id={task_id_str})")
-        return _exit_code
-    return None
+    print_and_log('info', f"[{method_name}] received execution exit code '{_exit_code}' (task_id={task_id_str})")
+    return _exit_code
 
 
 def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, image=None):
