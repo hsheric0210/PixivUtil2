@@ -44,8 +44,11 @@ logger = None
 _config = None
 _logpath = None
 aria2_inputfile = None
-zmq_pipe = None
-zmq_pipe_poller = None
+ipc_comm = None
+ipc_comm_poller = None
+ipc_task = None
+ipc_task_poller = None
+ipc = False
 __re_manga_index = re.compile(r'_p(\d+)')
 __badchars__ = None
 if platform.system() == 'Windows':
@@ -82,27 +85,38 @@ def set_make_aria2_inputfile(_aria2_inputfile):
     aria2_inputfile = _aria2_inputfile
 
 
-def create_pipe(_pipe_name):
-    global zmq_pipe
-    global zmq_pipe_poller
-    if _pipe_name is None:
+def create_pipes(_pipe_names):
+    global ipc, ipc_comm, ipc_comm_poller, ipc_task, ipc_task_poller
+    if _pipe_names is None:
         return
     ctx = zmq.Context()
+    # Remember, first one is for communication, next one is for task requesting
+    [commAddr, taskAddr] = _pipe_names.split('|', 2)
+    ipc_comm, ipc_comm_poller = establish_ipc(ctx, commAddr, b"Comm")
+    ipc_task, ipc_task_poller = establish_ipc(ctx, taskAddr, b"Task")
+    ipc = True
+
+
+def establish_ipc(context, address, type):
     try:
-        zmq_pipe = ctx.socket(zmq.REQ)
-        zmq_pipe.connect(_pipe_name)
-        zmq_pipe.send_multipart([b"HS", b"PixivUtil2"])
-        zmq_pipe_poller = zmq.Poller()
-        zmq_pipe_poller.register(zmq_pipe, zmq.POLLIN)
-        events = dict(zmq_pipe_poller.poll(3000))
-        if events and events.get(zmq_pipe) == zmq.POLLIN:
-            recv = zmq_pipe.recv_multipart(zmq.NOBLOCK)
+        pipe = context.socket(zmq.REQ)
+        pipe.connect(address)
+        pipe_poller = zmq.Poller()
+        pipe_poller.register(pipe, zmq.POLLIN)
+        pipe.send_multipart([b"HS", b"PixivUtil2", type])
+        events = dict(pipe_poller.poll(3000))
+        if events and events.get(pipe) == zmq.POLLIN:
+            recv = pipe.recv_multipart(zmq.NOBLOCK)
             if recv[0] != b"HS":
                 print_and_log('error', "Invalid response from pipe connection: '%s'" % recv)
-                raise ConnectionError(None, '0MQ connection not properly established', recv, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+                raise ConnectionError(None, '0MQ connection encountered unexpected response', recv, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
+            if recv[1] == b"ERROR":
+                print_and_log('error', "An error response received" % recv)
+                raise ConnectionError(None, '0MQ connection received error responses', recv, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
         else:
             raise ConnectionError(None, '0MQ connection timed out', 3000, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
         print_and_log('warn', '0MQ Pipe connected to: %s' % recv[1].decode())
+        return pipe, pipe_poller
     except Exception as ex:
         print_and_log('error', 'Pipe connection error', ex)
         raise ConnectionError(None, '0MQ connection not properly established', ex, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
@@ -428,7 +442,7 @@ def safePrint(msg, newline=True, end=None):
 
 def set_console_title(title):
     # Redirect title to IPC if available
-    if zmq_pipe is not None:
+    if ipc:
         ipc_notify([b"TITLE", title.encode(encoding='utf-8')])
         return
     try:
@@ -795,22 +809,17 @@ def download_image(url, filename, res, file_size, overwrite, referer):
     ''' Actual download, return the downloaded filesize and saved filename.'''
 
     if aria2_inputfile is not None:
-        # we have 100(!) chances
-        trial = 100
-        while trial > 0:
-            try:
-                with open(os.path.normpath(str(aria2_inputfile)), 'a', 1024) as aria2:
-                    aria2.write(url + '\n')
-                    aria2.write('  referer=' + referer + '\n')
-                    head, tail = os.path.split(filename)
-                    aria2.write('  dir=' + head + '\n')
-                    aria2.write('  out=' + tail + '\n')
-                print_and_log('info', f"[aria2] Successfully wrote input file, within {trial} trial(s) left")
-                break
-            # sometimes PermissionError is raised due to simultaneous open request of a file
-            except OSError as ex:
-                trial -= 1
-                print_and_log('error', f"[aria2] Failed to write input file, {trial} trial(s) left")
+        head, tail = os.path.split(filename)
+        query = str(url + os.linesep + '  referer=' + referer + os.linesep + '  dir=' + head + os.linesep + '  out=' + tail + os.linesep)
+        if ipc:
+            ipc_send(ipc_task, [b"Aria2", str(aria2_inputfile).encode('UTF-8'), query.encode('UTF-8')])
+            print_and_log('info', '[aria2] requested aria2 input file update')
+            [_, error_code] = ipc_recv(ipc_task, ipc_task_poller, None)
+            print_and_log('info', f"[aria2] Successfully updated input file; code={int.from_bytes(error_code, byteorder=sys.byteorder, signed=True)}")
+        else:
+            with open(os.path.normpath(str(aria2_inputfile)), 'a', 1024) as aria2:
+                aria2.write(query)
+            print_and_log('info', f"[aria2] Successfully updated input file")
         return (file_size, filename)
 
     start_time = datetime.now()
@@ -1072,27 +1081,20 @@ def ugoira2webm(ugoira_file, exportname, codec="libvpx-vp9", extension="webm", i
                    image=image)
 
 
-def ipc_recv(timeout, silent=False):
-    if zmq_pipe is None or zmq_pipe_poller is None:
+def ipc_recv(pipe, poller, timeout, silent=False):
+    if not ipc or poller is None:
         return None
-    events = dict(zmq_pipe_poller.poll(timeout))
-    if events and events.get(zmq_pipe) == zmq.POLLIN:
-        return zmq_pipe.recv_multipart(zmq.NOBLOCK)
+    events = dict(poller.poll(timeout))
+    if events and events.get(pipe) == zmq.POLLIN:
+        return pipe.recv_multipart(zmq.NOBLOCK)
     elif not silent:
         raise ConnectionError(None, '0MQ connection timed out', 2000, 0x000000E9)  # 0xE9 is "ERROR_PIPE_NOT_CONNECTED"
 
 
-def ipc_recv_response(resp_name, timeout, silent=False):
-    while True:
-        response = ipc_recv(timeout, silent)
-        if response is not None and response[0] == resp_name:
-            return response
-
-
-def ipc_send(msg, silent=False):
-    if zmq_pipe is not None:
+def ipc_send(pipe, msg, silent=False):
+    if pipe is not None:
         try:
-            zmq_pipe.send_multipart(msg)
+            pipe.send_multipart(msg)
             return True
         except Exception as ex:
             if not silent:
@@ -1101,8 +1103,8 @@ def ipc_send(msg, silent=False):
 
 
 def ipc_notify(msg):
-    if ipc_send(msg, True):
-        ipc_recv(1000, True)
+    if ipc_send(ipc_comm, msg, True):
+        ipc_recv(ipc_comm, ipc_comm_poller, 1000, True)
 
 
 def requestIPCtoRunFFmpeg(method_name, cmd):
@@ -1114,26 +1116,21 @@ def requestIPCtoRunFFmpeg(method_name, cmd):
         ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
 
     # we have 5 chances
-    trial = 5
-    while trial > 0:
-        try:
-            # enqueue execution and query the task id
-            ipc_send([b"FFmpeg_Req"] + ffmpeg_encoded_args)
-            print_and_log('info', f'[{method_name}] requested execution')
-            [_, task_id] = ipc_recv_response(b"FFmpeg_Req", 3000)
-            # query the ffmpeg exit code with given task id (this will block the execution until the ffmpeg process is finished)
-            print_and_log('info', f'[{method_name}] waiting cmd to be executed (task_id={task_id})')
-            ipc_send([b"FFmpeg_Ret"] + task_id)
-            print_and_log('info', f'[{method_name}] requested execution exit code (task_id={task_id})')
-            [_, exit_code] = ipc_recv_response(b"FFmpeg_Ret", None)
-            _exit_code = int.from_bytes(exit_code, byteorder=sys.byteorder, signed=True)
-            # negative exit code means there's no ffmpeg execution found with given task id, which is unexpected situation at this time
-            if _exit_code > 0:
-                print_and_log('info', f"[{method_name}] received execution exit code '{_exit_code}' (task_id={task_id})")
-                return _exit_code
-        except Exception as ex:
-            trial -= 1
-            print_and_log('error', f"[{method_name}] 0MQ ipc not responding, {trial} trial(s) left")
+    # enqueue execution and query the task id
+    ipc_send(ipc_task, [b"FFmpeg_Req"] + ffmpeg_encoded_args)
+    print_and_log('info', f'[{method_name}] requested execution')
+    [_, task_id] = ipc_recv(ipc_task, ipc_task_poller, 5000)
+    task_id_str = int.from_bytes(task_id, byteorder=sys.byteorder, signed=True)
+    # query the ffmpeg exit code with given task id (this will block the execution until the ffmpeg process is finished)
+    print_and_log('info', f'[{method_name}] waiting cmd to be executed (task_id={task_id_str})')
+    ipc_send(ipc_task, [b"FFmpeg_Ret", task_id])
+    print_and_log('info', f'[{method_name}] requested execution exit code (task_id={task_id_str})')
+    [_, exit_code] = ipc_recv(ipc_task, ipc_task_poller, None)
+    _exit_code = int.from_bytes(exit_code, byteorder=sys.byteorder, signed=True)
+    # negative exit code means there's no ffmpeg execution found with given task id, which is unexpected situation at this time
+    if _exit_code > 0:
+        print_and_log('info', f"[{method_name}] received execution exit code '{_exit_code}' (task_id={task_id_str})")
+        return _exit_code
     return None
 
 
@@ -1188,7 +1185,7 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
 
         check_image_encoding(d)
 
-        if zmq_pipe is not None:
+        if ipc:
             ret = requestIPCtoRunFFmpeg("convert_ugoira()", cmd)
             if ret is None:
                 return
@@ -1305,7 +1302,7 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
     cmd = f"-i {im_path} -pix_fmt {pix_fmt_nb_components[nb_channel]} {temp_name}"
 
     ret = None
-    if zmq_pipe is not None:
+    if ipc:
         ret = requestIPCtoRunFFmpeg("re_encode_image()", cmd)
     else:
         ffmpeg_args = shlex.split(f"ffmpeg {cmd}")

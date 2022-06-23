@@ -1623,7 +1623,7 @@ def main():
 
     __log__ = PixivHelper.get_logger()
 
-    PixivHelper.create_pipe(options.pipe_name)
+    PixivHelper.create_pipes(options.pipe_name)
     if options.pipe_name is not None:
         PixivHelper.safePrint('Using 0MG pipe: %s' % options.pipe_name)
 
