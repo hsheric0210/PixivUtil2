@@ -1115,7 +1115,6 @@ def requestIPCtoRunFFmpeg(method_name, cmd):
     for arg in shlex.split(cmd):
         ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
 
-    # we have 5 chances
     # enqueue execution and query the task id
     ipc_send(ipc_task, [b"FFmpeg_Req"] + ffmpeg_encoded_args)
     print_and_log('info', f'[{method_name}] requested execution')
