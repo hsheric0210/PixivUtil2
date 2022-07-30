@@ -1,4 +1,6 @@
 # Requirements:
+- ## [ParallelPixivUtil2](https://github.com/hsheric0210/ParallelPixivUtil2)
+  - ### This version of fork is intended to be used with ParallelPixivUtil2, which provides parallel execution capability to PixivUtil2.
 - Running from Windows binary:
   - minimum Windows 10 with latest updates installed.
 
