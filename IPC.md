@@ -1,7 +1,8 @@
 # (Draft) Usage of IPC support
 This version of PixivUtil2 supports messaging system with [ZeroMQ](https://gittehub.com/zeromq).
 To enable this feature, specify '--ipc' command line parameter with correct ipc address.
-The usage of '--ipc' parameter is '--ipc=<comm socket>|<task socket>'. Remind that the first address is for the communication socket, the second is for the task socket.
+The usage of '--ipc' parameter is '--ipc=<identifier>|<comm socket>|<task socket>'(with identifier) or '--ipc=<comm socket>|<task socket>'(without identifier, default identifier 'PixivUtil2' will be used).
+Remind that the first address is for the communication socket, the second is for the task socket.
 (Example: '--ipc=tcp://localhost:4048|tcp://localhost:4049')
 
 PixivUtil2 uses ZeroMQ RequestSocket to send messages. Thus, you should use ResponseSocket or RouterSocket to receive and process messages.
@@ -11,15 +12,15 @@ Since IPCv2 update, PixivUtil2 uses two socket(Communcation, Task socket) to com
 ## Communication socket
 ### HS - Handshake 
 * PixivUtil2 -> Client
-  1. PixivUtil2 Name and Version
+  1. Identifier and side type(Comm / Task)
 * Client -> PixivUtil2
   1. 'Ok' or 'Error'
 
-### IDENT - Change identifier
+### TOTAL - Notify total job count
 * PixivUtil2 -> Client
-  1. New identifier of this connection
+  1. Total job count
 * Client -> PixivUtil2
-  1. 'Ok' or 'Error'
+  1. 'Ok'
 
 ### DL - Download result
 * PixivUtil2 -> Client

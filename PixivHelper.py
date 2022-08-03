@@ -49,6 +49,7 @@ ipc_comm_poller = None
 ipc_task = None
 ipc_task_poller = None
 ipc = False
+ipc_ident = "";
 __re_manga_index = re.compile(r'_p(\d+)')
 __badchars__ = None
 if platform.system() == 'Windows':
@@ -85,15 +86,16 @@ def set_make_aria2_inputfile(_aria2_inputfile):
     aria2_inputfile = _aria2_inputfile
 
 
-def create_pipes(_pipe_names):
-    global ipc, ipc_comm, ipc_comm_poller, ipc_task, ipc_task_poller
+def create_pipes(_pipe_names: str):
+    global ipc, ipc_comm, ipc_comm_poller, ipc_task, ipc_task_poller, ipc_ident
     if _pipe_names is None:
         return
     ctx = zmq.Context()
     # Remember, first one is for communication, next one is for task requesting
-    [commAddr, taskAddr] = _pipe_names.split('|', 2)
-    ipc_comm, ipc_comm_poller = establish_ipc(ctx, commAddr, b"Comm")
-    ipc_task, ipc_task_poller = establish_ipc(ctx, taskAddr, b"Task")
+    [ident, comm_addr, task_addr]  = _pipe_names.split('|', 3)
+    ipc_ident = ident
+    ipc_comm, ipc_comm_poller = establish_ipc(ctx, comm_addr, b"Comm")
+    ipc_task, ipc_task_poller = establish_ipc(ctx, task_addr, b"Task")
     ipc = True
 
 
@@ -103,7 +105,7 @@ def establish_ipc(context, address, type):
         pipe.connect(address)
         pipe_poller = zmq.Poller()
         pipe_poller.register(pipe, zmq.POLLIN)
-        pipe.send_multipart([b"HS", b"PixivUtil2", type])
+        pipe.send_multipart([b"HS", ipc_ident.encode(encoding='utf-8'), type])
         events = dict(pipe_poller.poll(3000))
         if events and events.get(pipe) == zmq.POLLIN:
             recv = pipe.recv_multipart(zmq.NOBLOCK)

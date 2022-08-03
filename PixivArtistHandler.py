@@ -46,7 +46,6 @@ def process_member(caller,
             PixivHelper.print_and_log('info', 'Number of page setting will be ignored')
     elif config.numberOfPage != 0:
         PixivHelper.print_and_log('info', f'End Page from config: {config.numberOfPage}')
-    PixivHelper.ipc_notify([b"IDENT", f"{member_id}.({page}-{end_page})".encode(encoding='utf-8')])
 
     # calculate the offset for display properties
     offset = 48  # new offset for AJAX call
@@ -95,6 +94,7 @@ def process_member(caller,
                     traceback.print_exception(exc_type, exc_value, exc_traceback)
                     PixivHelper.print_and_log('error', f'Error at processing Artist Info: {sys.exc_info()}')
 
+            PixivHelper.ipc_notify([b'TOTAL', artist.totalImages.to_bytes(8, 'big')])
             PixivHelper.print_and_log(None, f'Member Name  : {artist.artistName}')
             PixivHelper.print_and_log(None, f'Member Avatar: {artist.artistAvatar}')
             PixivHelper.print_and_log(None, f'Member Token : {artist.artistToken}')
@@ -158,6 +158,7 @@ def process_member(caller,
                         else:
                             total_image_page_count = ((page - 1) * 20) + len(artist.imageList)
                         title_prefix_img = f"{title_prefix}MemberId: {member_id} Page: {page} Post {no_of_images}+{updated_limit_count} of {total_image_page_count}"
+                        # PixivHelper.ipc_notify([b'TOTAL', total_image_page_count.to_bytes(8, 'big')])
                         if not caller.DEBUG_SKIP_PROCESS_IMAGE:
                             result = PixivImageHandler.process_image(caller,
                                                                      config,

@@ -135,6 +135,8 @@ def process_tags(caller,
                                                                                                              images,
                                                                                                              skipped_count,
                                                                                                              total_image)
+                            PixivHelper.ipc_notify([b'TOTAL', total_image.to_bytes(length=4, byteorder='big')])
+
                             result = PixivConstant.PIXIVUTIL_OK
                             if not caller.DEBUG_SKIP_PROCESS_IMAGE:
                                 result = PixivImageHandler.process_image(caller,
