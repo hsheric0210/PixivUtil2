@@ -66,6 +66,9 @@ if platform.system() == "Windows":
         return pw
 
     getpass.getpass = win_getpass_with_mask
+    platform_encoding = 'utf-8-sig'
+else:
+    platform_encoding = 'utf-8'
 
 script_path = PixivHelper.module_path()
 
@@ -1168,6 +1171,16 @@ def menu_download_by_rank(op_is_valid, args, options, valid_modes=None):
                 break
             else:
                 print("Invalid Content Type.")
+        while True:
+            print(f"Specify the ranking date, valid type is YYYYMMDD (default: today)")
+            date = input('Date: ').rstrip("\r").lower()
+            try:
+                if date != '':
+                    datetime.datetime.strptime(date, "%Y%m%d")
+            except Exception as ex:
+                PixivHelper.print_and_log("error", f"Invalid format for ranking date: {date}.")
+            else:
+                break
         (start_page, end_page) = PixivHelper.get_start_and_end_number()
 
     PixivRankingHandler.process_ranking(sys.modules[__name__],
@@ -1621,8 +1634,6 @@ def main():
     if options.aria2_inputfile is not None:
         PixivHelper.safePrint('Making Aria2 input file: %s' % options.aria2_inputfile)
 
-    __log__ = PixivHelper.get_logger()
-
     PixivHelper.create_pipes(options.pipe_name)
     if options.pipe_name is not None:
         PixivHelper.safePrint('Using 0MG pipe: %s' % options.pipe_name)
@@ -1652,16 +1663,19 @@ def main():
         # Yavos: use print option instead when program should be running even with this error
         # end new lines by Yavos
 
+    try:
+        __config__.loadConfig(path=configfile)
+        PixivHelper.set_config(__config__)
+        __log__ = PixivHelper.get_logger(reload=True)
+    except BaseException:
+        PixivHelper.print_and_log("error", f'Failed to read configuration from {configfile}.')
+
+
     __log__.info('###############################################################')
     if len(sys.argv) == 0:
         __log__.info('Starting with no argument..')
     else:
         __log__.info('Starting with argument: [%s].', " ".join(sys.argv))
-    try:
-        __config__.loadConfig(path=configfile)
-        PixivHelper.set_config(__config__)
-    except BaseException:
-        PixivHelper.print_and_log("error", f'Failed to read configuration from {configfile}.')
 
     dbfile = options.dblocation
     if dbfile is None:
@@ -1690,13 +1704,6 @@ def main():
     if not os.path.exists(directory):
         os.makedirs(directory)
         __log__.info('Creating directory: %s', directory)
-
-    # write BOM
-    if start_iv or __config__.createDownloadLists:
-        if not os.path.isfile(dfilename) or os.path.getsize(dfilename) == 0:
-            dfile = codecs.open(dfilename, 'a+', encoding='utf-8')
-            dfile.write(u'\uefbbbf')
-            dfile.close()
 
     # Yavos: adding IrfanView-Handling
     start_irfan_slide = False
@@ -1743,7 +1750,7 @@ def main():
 
             import shlex
             cmd = f"{__config__.ffmpeg} -encoders"
-            ffmpeg_args = shlex.split(cmd)
+            ffmpeg_args = shlex.split(cmd, posix=False)
             try:
                 p = subprocess.run(ffmpeg_args, stderr=subprocess.PIPE, stdout=subprocess.PIPE, text=True, check=True)
                 buff = p.stdout

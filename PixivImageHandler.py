@@ -465,7 +465,7 @@ def process_ugoira_local(caller, config, subfolder_name):
                     PixivHelper.print_and_log(None, f"# Ugoira {counter}")
                     PixivHelper.print_and_log("info", f"Deleting old animated files ...", newline = False)
                     d = PixivHelper.create_temp_dir(prefix="reencoding")
-                    
+
                     # List and move all files related to the image_id
                     for file in os.listdir(zip_dir):
                         if os.path.isfile(os.path.join(zip_dir,file)) and zip_name in file:
@@ -484,7 +484,7 @@ def process_ugoira_local(caller, config, subfolder_name):
                                 else:
                                     shutil.move(abs_file_path, os.path.join(d, file_basename))
                     PixivHelper.print_and_log(None, f" done.")
-                    
+
                     # Process artwork locally
                     if "ugoira" in extension and not config.overwrite:
                         try:
@@ -507,7 +507,7 @@ def process_ugoira_local(caller, config, subfolder_name):
                                 PixivHelper.print_and_log('warn', f'Failed to process Image ID {image_id} locally: will retry with online infos')
                                 PixivHelper.print_and_log('debug', f'Removing corrupted ugoira {zip}')
                                 os.remove(zip)
-                    
+
                     # Process artwork with online infos
                     if "zip" in extension or res == PixivConstant.PIXIVUTIL_NOT_OK or ("ugoira" in extension and config.overwrite):
                         res = process_image(caller,
@@ -523,21 +523,29 @@ def process_ugoira_local(caller, config, subfolder_name):
                                 shutil.move(os.path.join(d, file_name), os.path.join(zip_dir, file_name)) # overwrite corrupted file generated
                             PixivHelper.print_and_log(None, f" done.")
                             print('')
-                    
+
                     # Checking result
                     list_file_zipdir = os.listdir(zip_dir)
                     for file_name in os.listdir(d):
                         if file_name not in list_file_zipdir and config.backupOldFile:
-                            split_name = file_name.rsplit(".", 1)
-                            new_name = file_name + "." + str(int(time.time()))
-                            if len(split_name) == 2:
-                                new_name = split_name[0] + "." + str(int(time.time())) + "." + split_name[1]
-                            PixivHelper.print_and_log('warn', f"Could not found the animated file re-encoded ==> {file_name}, backing up to: {new_name}")
-                            PixivHelper.print_and_log('warn', f"The new encoded file may have another name or the artist may have change its name")
-                            PixivHelper.print_and_log("debug", f"Rename and move {os.path.join(d, file_name)} to {os.path.join(zip_dir, new_name)}")
-                            shutil.move(os.path.join(d, file_name), os.path.join(zip_dir, new_name))
+                            file_ext = os.path.splitext(file_name)[1]
+                            if file_name not in list_file_zipdir and config.backupOldFile:
+                                if ((config.createUgoira and not config.deleteUgoira and "ugoira" in file_ext) or
+                                        (not config.deleteZipFile and "zip" in file_ext) or
+                                        (config.createGif and "gif" in file_ext) or
+                                        (config.createApng and "png" in file_ext) or
+                                        (config.createWebm and "webm" in file_ext) or
+                                        (config.createWebp and "webp" in file_ext)):
+                                    split_name = file_name.rsplit(".", 1)
+                                    new_name = file_name + "." + str(int(time.time()))
+                                    if len(split_name) == 2:
+                                        new_name = split_name[0] + "." + str(int(time.time())) + "." + split_name[1]
+                                    PixivHelper.print_and_log('warn', f"Could not found the animated file re-encoded ==> {file_name}, backing up to: {new_name}")
+                                    PixivHelper.print_and_log('warn', f"The new encoded file may have another name or the artist may have change its name")
+                                    PixivHelper.print_and_log("debug", f"Rename and move {os.path.join(d, file_name)} to {os.path.join(zip_dir, new_name)}")
+                                    shutil.move(os.path.join(d, file_name), os.path.join(zip_dir, new_name))
                     print('')
-                    
+
                     # Delete temp path
                     if os.path.exists(d) and d != "":
                         PixivHelper.print_and_log("debug", f"Deleting path {d}")
@@ -545,7 +553,7 @@ def process_ugoira_local(caller, config, subfolder_name):
                     list_done.append(image_id)
         if counter == 0:
             PixivHelper.print_and_log('info', "No zip file or ugoira found to re-encode animated files.")
-    
+
     except Exception as ex:
         if isinstance(ex, KeyboardInterrupt):
             raise
