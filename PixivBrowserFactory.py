@@ -273,6 +273,7 @@ class PixivBrowser(mechanize.Browser):
                                     PixivHelper.print_delay(2)
                                 print('')
                                 retry_count = retry_count + 1
+                                PixivHelper.print_and_log('info', f'Retry by too-many-requests #{retry_count}')
                             else:
                                 raise PixivException(f"Failed to get page (Too many requests): {url}", errorCode=PixivException.SERVER_ERROR)
                         elif ex.code in [403, 404, 503]:

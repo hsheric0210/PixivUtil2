@@ -1128,8 +1128,8 @@ def requestIPCtoRunFFmpeg(method_name, cmd):
 
     # split and encode ffmpeg arguments
     ffmpeg_encoded_args = []
-    for arg in shlex.split(cmd):
-        ffmpeg_encoded_args.append(arg.encode(encoding='UTF-8'))
+    for arg in shlex.split(cmd, posix=False):
+        ffmpeg_encoded_args.append(arg.replace('"', '').encode(encoding='UTF-8'))
 
     # enqueue execution and query the task id
     ipc_send(ipc_task, [b"FFmpeg_Req"] + ffmpeg_encoded_args)
@@ -1221,9 +1221,12 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
                 return
         else:
             ffmpeg_args = shlex.split(f"{ffmpeg} {cmd}", posix=False)
-            print_and_log('info', f"[convert_ugoira()] running with cmd: {cmd}")
+            ffmpeg_args_fixed = []
+            for arg in ffmpeg_args:
+                ffmpeg_args_fixed.append(arg.replace('"', ''))
+            print_and_log('info', f"[convert_ugoira()] running with cmd: {ffmpeg_args_fixed}")
 
-            p = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)
+            p = subprocess.Popen(ffmpeg_args_fixed, stderr=subprocess.PIPE)
 
             # progress report
             print_and_log('info', f"Start encoding {exportname}")
@@ -1338,8 +1341,11 @@ def re_encode_image(nb_channel: int, im_path: str) -> None:
         ret = requestIPCtoRunFFmpeg("re_encode_image()", cmd)
     else:
         ffmpeg_args = shlex.split(f"ffmpeg {cmd}", posix=False)
-        get_logger().info(f"[re_encode_image()] running with cmd: {cmd}")
-        p = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)
+        ffmpeg_args_fixed = []
+        for arg in ffmpeg_args:
+            ffmpeg_args_fixed.append(arg.replace('"', ''))
+        get_logger().info(f"[re_encode_image()] running with cmd: {ffmpeg_args_fixed}")
+        p = subprocess.Popen(ffmpeg_args_fixed, stderr=subprocess.PIPE)
 
         # progress report
         print_and_log('debug', f"Start re_encoding image {im_path}")
