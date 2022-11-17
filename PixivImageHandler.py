@@ -464,7 +464,7 @@ def process_ugoira_local(caller, config, subfolder_name):
                     counter += 1
                     PixivHelper.print_and_log(None, f"# Ugoira {counter}")
                     PixivHelper.print_and_log("info", f"Deleting old animated files ...", newline = False)
-                    d = PixivHelper.create_temp_dir(prefix="reencoding")
+                    d = PixivHelper.create_temp_dir(prefix="convert_ugoira")
 
                     # List and move all files related to the image_id
                     for file in os.listdir(zip_dir):

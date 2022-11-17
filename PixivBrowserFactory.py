@@ -215,7 +215,15 @@ class PixivBrowser(mechanize.Browser):
                     print(f"Response Headers: {res.headers}")
                     if res.code == '302':
                         print(f"Redirect to {res.headers['location']}")
-                raise
+                if retry_count < retry:
+                    print(exc_value, end=' ')
+                    for t in range(1, self._config.retryWait):
+                        print(t, end=' ')
+                        PixivHelper.print_delay(2)
+                    print('')
+                    retry_count = retry_count + 1
+                else:
+                    raise
             except BaseException:
                 exc_value = sys.exc_info()[1]
                 if retry_count < retry:
@@ -257,7 +265,17 @@ class PixivBrowser(mechanize.Browser):
                         temp.close()
                         break
                     except urllib.error.HTTPError as ex:
-                        if ex.code in [403, 404, 503]:
+                        if ex.code in [427, 500]:
+                            if retry_count < self._config.retry:
+                                print(exc_value, end=' ')
+                                for t in range(1, self._config.retryWait):
+                                    print(t, end=' ')
+                                    PixivHelper.print_delay(2)
+                                print('')
+                                retry_count = retry_count + 1
+                            else:
+                                raise PixivException(f"Failed to get page (Too many requests): {url}", errorCode=PixivException.SERVER_ERROR)
+                        elif ex.code in [403, 404, 503]:
                             read_page = ex.read()
                             raise PixivException(f"Failed to get page: {url} => {ex}", errorCode=PixivException.SERVER_ERROR)
                         else:

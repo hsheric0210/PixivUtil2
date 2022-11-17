@@ -1147,6 +1147,21 @@ def requestIPCtoRunFFmpeg(method_name, cmd):
     return _exit_code
 
 
+def create_temp_dir(prefix: str = None) -> str:
+    d = tempfile.mkdtemp(prefix=prefix)
+
+    # Issue #1035
+    if not os.path.exists(d):
+        new_temp = os.path.abspath(f"file_{int(datetime.now().timestamp())}")
+        os.makedirs(new_temp)
+        print_and_log("warn", f"Cannot create temp folder at {d}, using current folder as the temp location => {new_temp}")
+        d = new_temp
+        # check again if still fail
+        if not os.path.exists(d):
+            raise PixivException(f"Cannot create temp folder => {d}", errorCode=PixivException.OTHER_ERROR)
+    return d
+
+
 def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, image=None):
     ''' modified based on https://github.com/tsudoko/ugoira-tools/blob/master/ugoira2webm/ugoira2webm.py '''
     # if not os.path.exists(os.path.abspath(ffmpeg)):
@@ -1191,8 +1206,12 @@ def convert_ugoira(ugoira_file, exportname, ffmpeg, codec, param, extension, ima
         # this will increase the frame count, but will fix the last frame timestamp issue.
         ffconcat += "file " + frames[-1]['file'] + '\n'
 
-        with open(d + f"{os.sep}i.ffconcat", "w") as f:
+        ffcfile = d + f"{os.sep}i.ffconcat"
+
+        with open(ffcfile, "w") as f:
             f.write(ffconcat)
+
+        print_and_log('info', f"wrote ffconcat file to {ffcfile}")
 
         check_image_encoding(d)
 
