@@ -464,7 +464,7 @@ def process_ugoira_local(caller, config, subfolder_name):
                     counter += 1
                     PixivHelper.print_and_log(None, f"# Ugoira {counter}")
                     PixivHelper.print_and_log("info", f"Deleting old animated files ...", newline = False)
-                    d = PixivHelper.create_temp_dir(prefix="convert_ugoira")
+                    d = PixivHelper.create_temp_dir(prefix="reencoding")
 
                     # List and move all files related to the image_id
                     for file in os.listdir(zip_dir):
@@ -478,11 +478,14 @@ def process_ugoira_local(caller, config, subfolder_name):
                                 (("ugoira"in file_ext) and (config.createUgoira))       or
                                 ("zip" in file_ext)):
                                 abs_file_path = os.path.abspath(os.path.join(zip_dir,file))
-                                PixivHelper.print_and_log("debug", f"Moving {abs_file_path} to {d}")
-                                if ("zip" in file_ext) or ("ugoira" in file_ext):
-                                    shutil.copy2(abs_file_path, os.path.join(d, file_basename))
+                                if os.path.exists(abs_file_path):
+                                    PixivHelper.print_and_log("debug", f"Moving {abs_file_path} to {d}")
+                                    if ("zip" in file_ext) or ("ugoira" in file_ext):
+                                        shutil.copy2(abs_file_path, os.path.join(d, file_basename))
+                                    else:
+                                        shutil.move(abs_file_path, os.path.join(d, file_basename))
                                 else:
-                                    shutil.move(abs_file_path, os.path.join(d, file_basename))
+                                    PixivHelper.print_and_log('warn', f" File {abs_file_path} not found.")
                     PixivHelper.print_and_log(None, f" done.")
 
                     # Process artwork locally

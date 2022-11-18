@@ -217,23 +217,19 @@ class PixivBrowser(mechanize.Browser):
                         print(f"Redirect to {res.headers['location']}")
                 if retry_count < retry:
                     print(exc_value, end=' ')
-                    for t in range(1, self._config.retryWait):
-                        print(t, end=' ')
-                        PixivHelper.print_delay(2)
                     print('')
                     retry_count = retry_count + 1
-                    PixivHelper.print_and_log('info', f'Retry by too-many-requests #{retry_count}')
+                    PixivHelper.print_and_log('warn', f'Retry by too-many-requests #{retry_count}')
+                    PixivHelper.print_delay(self._config.retryWait)
                 else:
                     raise
             except BaseException:
                 exc_value = sys.exc_info()[1]
                 if retry_count < retry:
                     print(exc_value, end=' ')
-                    for t in range(1, self._config.retryWait):
-                        print(t, end=' ')
-                        PixivHelper.print_delay(2)
                     print('')
                     retry_count = retry_count + 1
+                    PixivHelper.print_delay(self._config.retryWait)
                 else:
                     temp = url
                     if isinstance(url, urllib.request.Request):
@@ -266,15 +262,13 @@ class PixivBrowser(mechanize.Browser):
                         temp.close()
                         break
                     except urllib.error.HTTPError as ex:
-                        if ex.code in [427, 500]:
+                        if ex.code in [427, 500, 502]:  # Too many requests
                             if retry_count < self._config.retry:
                                 print(exc_value, end=' ')
-                                for t in range(1, self._config.retryWait):
-                                    print(t, end=' ')
-                                    PixivHelper.print_delay(2)
                                 print('')
                                 retry_count = retry_count + 1
-                                PixivHelper.print_and_log('info', f'Retry by too-many-requests #{retry_count}')
+                                PixivHelper.print_and_log('warn', f'Retry by too-many-requests error (HTTP {ex.code}) #{retry_count}')
+                                PixivHelper.print_delay(self._config.retryWait)
                             else:
                                 raise PixivException(f"Failed to get page (Too many requests): {url}", errorCode=PixivException.SERVER_ERROR)
                         elif ex.code in [403, 404, 503]:
@@ -287,11 +281,9 @@ class PixivBrowser(mechanize.Browser):
                         exc_value = sys.exc_info()[1]
                         if retry_count < self._config.retry:
                             print(exc_value, end=' ')
-                            for t in range(1, self._config.retryWait):
-                                print(t, end=' ')
-                                PixivHelper.print_delay(2)
                             print('')
                             retry_count = retry_count + 1
+                            PixivHelper.print_delay(self._config.retryWait)
                         else:
                             raise PixivException(f"Failed to get page: {url}", errorCode=PixivException.SERVER_ERROR)
 

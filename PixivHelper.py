@@ -827,13 +827,13 @@ def download_image(url, filename, res, file_size, overwrite, referer):
         query = str(url + os.linesep + '  referer=' + referer + os.linesep + '  dir=' + head + os.linesep + '  out=' + tail + os.linesep)
         if ipc:
             ipc_send(ipc_task, [b"Aria2", str(aria2_inputfile).encode('UTF-8'), query.encode('UTF-8')])
-            print_and_log('info', '[aria2] requested aria2 input file update')
+            print_and_log('info', '[aria2] Enqueued aria2 download list file update')
             [_, error_code] = ipc_recv(ipc_task, ipc_task_poller, None)
-            print_and_log('info', f"[aria2] Successfully updated input file; code={int.from_bytes(error_code, byteorder=sys.byteorder, signed=True)}")
+            print_and_log('info', f"[aria2] Updated download list file; code={int.from_bytes(error_code, byteorder=sys.byteorder, signed=True)}")
         else:
             with open(os.path.normpath(str(aria2_inputfile)), 'a', 1024) as aria2:
                 aria2.write(query)
-            print_and_log('info', f"[aria2] Successfully updated input file")
+            print_and_log('info', f"[aria2] Successfully updated aria2 download list file")
         return (file_size, filename)
 
     start_time = datetime.now()
