@@ -209,26 +209,34 @@ class PixivBrowser(mechanize.Browser):
             try:
                 res = self.open(url, data, timeout)
                 return res
-            except urllib.error.HTTPError:
+            except urllib.error.HTTPError as ex:
+                code = ex.code
+                headers = ex.headers
                 if res is not None:
-                    print(f"Error Code: {res.code}")
-                    print(f"Response Headers: {res.headers}")
-                    if res.code == '302':
-                        print(f"Redirect to {res.headers['location']}")
+                    code = int(res.code)
+                    headers = res.headers
+                PixivHelper.print_and_log('warn', f"Error Code: {code}")
+                PixivHelper.print_and_log('warn', f"Response Headers: {headers}")
+                if code == 302:
+                    PixivHelper.print_and_log('warn', f"Redirect to {headers['location']}")
+                if code == 429:
+                    PixivHelper.print_and_log('warn', f"x-ratelimit-reset: {headers['x-ratelimit-reset']}")
+                    PixivHelper.print_and_log('warn', f"retry-after: {headers['Retry-After']}")
                 if retry_count < retry:
-                    print(exc_value, end=' ')
                     print('')
                     retry_count = retry_count + 1
                     PixivHelper.print_and_log('warn', f'Retry by too-many-requests #{retry_count}')
+                    if code not in [429, 500, 502, 504]:
+                        PixivHelper.print_and_log('error', 'The error', ex)
                     PixivHelper.print_delay(self._config.retryWait)
                 else:
                     raise
-            except BaseException:
-                exc_value = sys.exc_info()[1]
+            except BaseException as ex:
                 if retry_count < retry:
-                    print(exc_value, end=' ')
                     print('')
                     retry_count = retry_count + 1
+                    PixivHelper.print_and_log('error', f'Retry by exception #{retry_count}')
+                    PixivHelper.print_and_log('error', 'The exception', ex)
                     PixivHelper.print_delay(self._config.retryWait)
                 else:
                     temp = url
@@ -262,9 +270,9 @@ class PixivBrowser(mechanize.Browser):
                         temp.close()
                         break
                     except urllib.error.HTTPError as ex:
-                        if ex.code in [427, 500, 502]:  # Too many requests
+                        PixivHelper.print_and_log('warn', f'Got HTTP {ex.code}')
+                        if ex.code in [429, 500, 502, 504]:  # Too many requests
                             if retry_count < self._config.retry:
-                                print(exc_value, end=' ')
                                 print('')
                                 retry_count = retry_count + 1
                                 PixivHelper.print_and_log('warn', f'Retry by too-many-requests error (HTTP {ex.code}) #{retry_count}')
@@ -277,12 +285,11 @@ class PixivBrowser(mechanize.Browser):
                         else:
                             PixivHelper.print_and_log('error', f'Error at getPixivPage(): {sys.exc_info()}')
                             raise PixivException(f"Failed to get page: {url}", errorCode=PixivException.SERVER_ERROR)
-                    except BaseException:
-                        exc_value = sys.exc_info()[1]
+                    except BaseException as ex:
                         if retry_count < self._config.retry:
-                            print(exc_value, end=' ')
                             print('')
                             retry_count = retry_count + 1
+                            PixivHelper.print_and_log('error', f'Retry by Exception #{retry_count}', ex)
                             PixivHelper.print_delay(self._config.retryWait)
                         else:
                             raise PixivException(f"Failed to get page: {url}", errorCode=PixivException.SERVER_ERROR)
