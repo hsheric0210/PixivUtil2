@@ -5,6 +5,7 @@ import traceback
 
 import PixivBrowserFactory
 import PixivHelper
+import base64
 from PixivException import PixivException
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
@@ -28,7 +29,7 @@ def export_member_list(caller,
                 try:
                     (artist, list_page) = PixivBrowserFactory.getBrowser().getMemberPage(_member_id, 1, False, None, r18mode=config.r18mode, throw_empty_error=False, no_logs=True)
                     with dump_lock:
-                        dumps.append({'member_id': _member_id, 'total_images': artist.totalImages, 'token': artist.artistToken, 'avatar': artist.artistAvatar})
+                        dumps.append({'member_id': _member_id, 'total_images': artist.totalImages, 'token': artist.artistToken, 'member_name': base64.b64encode(artist.artistName.encode('utf-8')).decode('ascii'), 'avatar': artist.artistAvatar})
                         print(f"Result for member \'{_member_id}\': [name=\"{artist.artistName}\", total_images={artist.totalImages}, token=\"{artist.artistToken}\", avatar=\"{artist.artistAvatar}\"]")
                     break
                 except PixivException as ex:
@@ -54,6 +55,7 @@ def export_member_list(caller,
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     traceback.print_exception(exc_type, exc_value, exc_traceback)
                     PixivHelper.print_and_log('error', f'Error at processing Artist Info: {sys.exc_info()}')
+                    raise
         except KeyboardInterrupt:
             raise
         except BaseException:

@@ -222,12 +222,10 @@ class PixivBrowser(mechanize.Browser):
                 if code == 429:
                     PixivHelper.print_and_log('warn', f"x-ratelimit-reset: {headers['x-ratelimit-reset']}")
                     PixivHelper.print_and_log('warn', f"retry-after: {headers['Retry-After']}")
-                if retry_count < retry:
+                if code in [429, 500, 502, 504] and retry_count < retry:
                     print('')
                     retry_count = retry_count + 1
                     PixivHelper.print_and_log('warn', f'Retry by too-many-requests #{retry_count}')
-                    if code not in [429, 500, 502, 504]:
-                        PixivHelper.print_and_log('error', 'The error', ex)
                     PixivHelper.print_delay(self._config.retryWait)
                 else:
                     raise
